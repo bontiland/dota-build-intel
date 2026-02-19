@@ -10,19 +10,23 @@
     ::-webkit-scrollbar{width:4px}
     ::-webkit-scrollbar-thumb{background:rgba(245,158,11,.4);border-radius:2px}
     @keyframes spin{to{transform:rotate(360deg)}}
-    .hrow{transition:background .15s;cursor:pointer;border:none;width:100%;text-align:left;background:transparent;border-left:3px solid transparent}
-    .hrow:hover{background:rgba(245,158,11,.08)!important}
-    .hrow.active{background:rgba(245,158,11,.14)!important;border-left-color:#f59e0b!important}
+    @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    .hrow{transition:background .12s;cursor:pointer;border:none;width:100%;text-align:left;background:transparent;border-left:3px solid transparent;display:flex;align-items:center;gap:9px;padding:7px 10px}
+    .hrow:hover{background:rgba(245,158,11,.08)}
+    .hrow.active{background:rgba(245,158,11,.14);border-left-color:#f59e0b}
     .tab{background:transparent;border:none;border-bottom:2px solid transparent;color:#6b7280;padding:10px 18px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;margin-bottom:-1px;transition:all .2s}
     .tab.active{color:#f59e0b;border-bottom-color:#f59e0b}
-    input{outline:none}
+    input{outline:none;transition:border-color .2s}
     input:focus{border-color:rgba(245,158,11,.7)!important}
-    button{font-family:inherit}
   </style>
 </head>
 <body>
 <div id="app"></div>
 <script>
+// ─── TOKEN & ENDPOINT ────────────────────────────────────────────────────
+const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJTdWJqZWN0IjoiMzIzZmQ3NzgtNzNhNC00YWFkLWE4OTctNWU1Y2E4MTRhYzBkIiwiU3RlYW1JZCI6IjE1NzIzNzI4MyIsIkFQSVVzZXIiOiJ0cnVlIiwibmJmIjoxNzcxNTM2MzE5LCJleHAiOjE4MDMwNzIzMTksImlhdCI6MTc3MTUzNjMxOSwiaXNzIjoiaHR0cHM6Ly9hcGkuc3RyYXR6LmNvbSJ9.rrLRWszzVEOqTJ0nfVI33jeUv6Q8gs3QI4vGE_DN4VA";
+const GQL = "https://api.stratz.com/graphql";
+
 // ─── HEROES ──────────────────────────────────────────────────────────────
 const RC={Carry:"#f59e0b",Support:"#60a5fa",Nuker:"#f87171",Disabler:"#a78bfa",Jungler:"#34d399",Durable:"#fb923c",Escape:"#e879f9",Pusher:"#4ade80",Initiator:"#fbbf24"};
 const HEROES=[
@@ -155,97 +159,145 @@ const HEROES=[
 ].sort((a,b)=>a.f.localeCompare(b.f));
 
 const HIMG = n=>`https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/${n}.png`;
-const IIMG = n=>`https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/items/${n.replace('item_','')}.png`;
+const IIMG = n=>`https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/items/${n}.png`;
+
+// ─── ITEM ID MAP (STRATZ devuelve IDs numéricos) ─────────────────────────
+// Se carga dinámicamente desde la API de STRATZ
+let ITEM_MAP = {}; // id -> {shortName, displayName}
+
+async function loadItemMap() {
+  if (Object.keys(ITEM_MAP).length > 0) return;
+  try {
+    const q = `{ constants { items { id displayName shortName } } }`;
+    const res = await gql(q);
+    (res.data?.constants?.items || []).forEach(it => {
+      ITEM_MAP[it.id] = { name: it.displayName || it.shortName, short: it.shortName };
+    });
+  } catch(e) { console.warn('No se pudo cargar item map:', e); }
+}
 
 // ─── STATE ───────────────────────────────────────────────────────────────
-let S={search:'',hero:null,loading:false,error:null,timings:null,tab:'items'};
+let S={search:'',hero:null,loading:false,error:null,phases:null,tab:'items'};
 const set=p=>{Object.assign(S,p);draw()};
 
-// ─── API ─────────────────────────────────────────────────────────────────
-// Using /scenarios/itemTimings?hero_id=X — the real endpoint with actual data
-async function loadHero(hero){
-  set({hero,loading:true,error:null,timings:null,search:'',tab:'items'});
-  try{
-    // Fetch item timings for this hero — returns array of {hero_id, item, time, games, wins}
-    const url=`https://api.opendota.com/api/scenarios/itemTimings?hero_id=${hero.id}`;
-    const res=await fetch(url);
-    if(!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data=await res.json();
-    if(!Array.isArray(data)) throw new Error('Respuesta inesperada de la API');
-    set({loading:false,timings:data});
-  }catch(e){
-    set({loading:false,error:e.message});
+// ─── STRATZ GRAPHQL ──────────────────────────────────────────────────────
+async function gql(query) {
+  const res = await fetch(GQL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${TOKEN}`
+    },
+    body: JSON.stringify({ query })
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// Query principal: items del héroe por timing con winrate
+// heroStats -> itemFullPurchase devuelve {itemId, matchCount, winCount, time (minutos)}
+function buildQuery(heroId) {
+  return `{
+    heroStats {
+      itemFullPurchase(heroId: ${heroId}, take: 200) {
+        itemId
+        matchCount
+        winCount
+        time
+      }
+    }
+  }`;
+}
+
+async function loadHero(hero) {
+  set({hero, loading:true, error:null, phases:null, search:'', tab:'items'});
+  try {
+    await loadItemMap();
+    const data = await gql(buildQuery(hero.id));
+    const items = data?.data?.heroStats?.itemFullPurchase || [];
+
+    if (!Array.isArray(items) || items.length === 0) {
+      set({loading:false, error:'La API no devolvió datos para este héroe. Intenta con otro.'});
+      return;
+    }
+
+    // Group by time phases (minutes)
+    const phases = [
+      {label:'Inicio', icon:'🌅', range:'0-10 min',  min:0,  max:10},
+      {label:'Early',  icon:'⚡', range:'10-20 min', min:10, max:20},
+      {label:'Mid',    icon:'⚔️', range:'20-30 min', min:20, max:30},
+      {label:'Late',   icon:'👑', range:'30+ min',   min:30, max:999},
+    ].map(p => {
+      // Aggregate same items in this time window
+      const agg = {};
+      items
+        .filter(it => it.time >= p.min && it.time < p.max)
+        .forEach(it => {
+          if (!agg[it.itemId]) agg[it.itemId] = {matches:0, wins:0};
+          agg[it.itemId].matches += it.matchCount;
+          agg[it.itemId].wins   += it.winCount;
+        });
+
+      const list = Object.entries(agg)
+        .filter(([,v]) => v.matches >= 50)
+        .map(([id, v]) => ({
+          id: parseInt(id),
+          wr: v.wins / v.matches,
+          matches: v.matches,
+          name: ITEM_MAP[id]?.name || `Item ${id}`,
+          short: ITEM_MAP[id]?.short || `item_${id}`,
+        }))
+        .sort((a,b) => b.wr - a.wr)
+        .slice(0, 6);
+
+      return {...p, list};
+    });
+
+    set({loading:false, phases});
+  } catch(e) {
+    set({loading:false, error:`Error: ${e.message}`});
   }
 }
 
-// ─── PROCESS DATA ────────────────────────────────────────────────────────
-// timings: [{hero_id, item, time (seconds), games (string), wins (string)}]
-// Group by time buckets: 0-10min, 10-20min, 20-30min, 30+min
-function processTimings(timings){
-  const phases=[
-    {label:'Inicio',icon:'🌅',min:0,max:600},      // 0-10 min
-    {label:'Early',icon:'⚡',min:600,max:1200},    // 10-20 min
-    {label:'Mid',icon:'⚔️',min:1200,max:1800},     // 20-30 min
-    {label:'Late',icon:'👑',min:1800,max:99999},   // 30+ min
-  ];
-  return phases.map(p=>{
-    // Aggregate items in this time window
-    const agg={};
-    timings
-      .filter(t=>t.time>=p.min && t.time<p.max)
-      .forEach(t=>{
-        const g=parseInt(t.games)||0;
-        const w=parseInt(t.wins)||0;
-        if(!agg[t.item]) agg[t.item]={games:0,wins:0};
-        agg[t.item].games+=g;
-        agg[t.item].wins+=w;
-      });
-    const list=Object.entries(agg)
-      .filter(([,v])=>v.games>=100) // mínimo 100 partidas para ser confiable
-      .map(([item,v])=>({item,wr:v.wins/v.games,games:v.games}))
-      .sort((a,b)=>b.wr-a.wr)
-      .slice(0,6);
-    return {...p,list};
-  });
-}
-
-// ─── HELPERS ─────────────────────────────────────────────────────────────
-function wrBadge(wr){
-  const p=Math.round(wr*100);
-  const c=p>=55?'#4ade80':p>=50?'#fbbf24':'#f87171';
+// ─── RENDER ──────────────────────────────────────────────────────────────
+function wrBadge(wr) {
+  const p = Math.round(wr*100);
+  const c = p>=55?'#4ade80':p>=50?'#fbbf24':'#f87171';
   return `<span style="color:${c};font-weight:700;font-family:monospace;font-size:13px">${p}% WR</span>`;
 }
 
-function itemCard(entry,i){
-  const name=entry.item.replace('item_','').replace(/_/g,' ');
-  return`<div style="flex:1 1 110px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;border-right:1px solid rgba(255,255,255,.04);text-align:center">
-    <span style="font-size:10px;color:${i===0?'#f59e0b':'#374151'};font-family:monospace;font-weight:700">#${i+1}</span>
-    <img src="${IIMG(entry.item)}" style="width:72px;height:52px;object-fit:cover;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:#1a2030" onerror="this.style.opacity='.3'"/>
-    <div style="font-size:11px;color:#9ca3af;text-transform:capitalize;max-width:100px;line-height:1.3">${name}</div>
-    ${wrBadge(entry.wr)}
-    <div style="font-size:10px;color:#374151;font-family:monospace">${entry.games.toLocaleString()} partidas</div>
-  </div>`;
+function itemCard(it, i) {
+  const imgUrl = IIMG(it.short);
+  return `
+    <div style="flex:1 1 110px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;border-right:1px solid rgba(255,255,255,.04);text-align:center">
+      <span style="font-size:10px;color:${i===0?'#f59e0b':'#374151'};font-family:monospace;font-weight:700">#${i+1}</span>
+      <img src="${imgUrl}" style="width:72px;height:52px;object-fit:cover;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:#1a2030"
+           onerror="this.style.opacity='.25'" title="${it.name}"/>
+      <div style="font-size:11px;color:#9ca3af;max-width:100px;line-height:1.3;text-transform:capitalize">${it.name}</div>
+      ${wrBadge(it.wr)}
+      <div style="font-size:10px;color:#374151;font-family:monospace">${it.matches.toLocaleString()} partidas</div>
+    </div>`;
 }
 
-function phaseCard(phase){
-  return`<div style="background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:12px;overflow:hidden;margin-bottom:16px">
-    <div style="padding:11px 16px;background:rgba(255,255,255,.02);border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:space-between">
-      <span style="font-size:13px;font-weight:800;letter-spacing:1.5px;color:#f59e0b;text-transform:uppercase">${phase.icon} ${phase.label} game</span>
-      <span style="font-size:10px;color:#374151">${phase.label==='Inicio'?'0-10 min':phase.label==='Early'?'10-20 min':phase.label==='Mid'?'20-30 min':'30+ min'} · mín. 100 partidas</span>
-    </div>
-    ${phase.list.length===0
-      ?`<div style="padding:18px;color:#374151;font-size:12px;text-align:center;font-style:italic">Sin suficientes datos en esta fase</div>`
-      :`<div style="display:flex;flex-wrap:wrap">${phase.list.map((e,i)=>itemCard(e,i)).join('')}</div>`
-    }
-  </div>`;
+function phaseCard(p) {
+  return `
+    <div style="background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:12px;overflow:hidden;margin-bottom:16px">
+      <div style="padding:11px 16px;background:rgba(255,255,255,.02);border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:13px;font-weight:800;letter-spacing:1.5px;color:#f59e0b;text-transform:uppercase">${p.icon} ${p.label} GAME</span>
+        <span style="font-size:10px;color:#374151">${p.range} · mín. 50 partidas</span>
+      </div>
+      ${p.list.length === 0
+        ? `<div style="padding:18px;color:#374151;font-size:12px;text-align:center;font-style:italic">Sin datos suficientes en esta fase</div>`
+        : `<div style="display:flex;flex-wrap:wrap">${p.list.map((it,i) => itemCard(it,i)).join('')}</div>`
+      }
+    </div>`;
 }
 
-// ─── RENDER ──────────────────────────────────────────────────────────────
-function draw(){
-  const{search,hero,loading,error,timings,tab}=S;
-  const list=(search?HEROES.filter(h=>h.f.toLowerCase().includes(search.toLowerCase())):HEROES);
+function draw() {
+  const {search, hero, loading, error, phases} = S;
+  const list = search ? HEROES.filter(h=>h.f.toLowerCase().includes(search.toLowerCase())) : HEROES;
 
-  document.getElementById('app').innerHTML=`
+  document.getElementById('app').innerHTML = `
   <div style="display:flex;flex-direction:column;min-height:100vh">
 
     <!-- HEADER -->
@@ -254,7 +306,7 @@ function draw(){
         <span style="color:#f59e0b;font-size:18px">◆</span>
         <span style="font-size:16px;font-weight:900;letter-spacing:3px;color:#fff">DOTA BUILD INTEL</span>
       </div>
-      <span style="font-size:11px;color:#374151">${HEROES.length} héroes · OpenDota API</span>
+      <span style="font-size:11px;color:#374151">${HEROES.length} héroes · STRATZ API</span>
     </header>
 
     <div style="display:flex;flex:1;height:calc(100vh - 50px);overflow:hidden">
@@ -263,17 +315,17 @@ function draw(){
       <aside style="width:250px;background:#0d1017;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0">
         <div style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06)">
           <div style="position:relative">
-            <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none">🔍</span>
-            <input id="si" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:8px 8px 8px 30px;color:#e2e8f0;font-size:13px;font-family:inherit"
+            <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:13px">🔍</span>
+            <input id="si"
+              style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:8px 8px 8px 30px;color:#e2e8f0;font-size:13px;font-family:inherit"
               placeholder="Buscar héroe..." value="${search}" autocomplete="off"/>
           </div>
-          ${search?`<div style="font-size:11px;color:#4b5563;margin-top:4px;padding-left:2px">${list.length} resultado${list.length!==1?'s':''}</div>`:''}
+          ${search ? `<div style="font-size:11px;color:#4b5563;margin-top:4px;padding-left:2px">${list.length} resultado${list.length!==1?'s':''}</div>` : ''}
         </div>
         <div style="flex:1;overflow-y:auto">
-          ${list.map(h=>`
-            <button class="hrow${hero?.id===h.id?' active':''}" onclick="pick(${h.id})"
-              style="padding:7px 10px;display:flex;align-items:center;gap:9px">
-              <img src="${HIMG(h.n)}" style="width:46px;height:26px;border-radius:4px;object-fit:cover;background:#1a2030;flex-shrink:0" onerror="this.style.opacity='.15'"/>
+          ${list.map(h => `
+            <button class="hrow${hero?.id===h.id?' active':''}" onclick="pick(${h.id})">
+              <img src="${HIMG(h.n)}" style="width:46px;height:26px;border-radius:4px;object-fit:cover;background:#1a2030;flex-shrink:0" onerror="this.style.opacity='.1'"/>
               <div style="flex:1;min-width:0">
                 <div style="font-size:12px;color:${hero?.id===h.id?'#f59e0b':'#d1d5db'};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.f}</div>
                 <div style="display:flex;gap:4px;margin-top:2px">
@@ -286,13 +338,16 @@ function draw(){
 
       <!-- MAIN -->
       <main style="flex:1;overflow-y:auto;min-width:0">
-        ${!hero?`
+        ${!hero ? `
           <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;padding:40px;text-align:center">
             <div style="font-size:64px">⚔️</div>
             <div style="font-size:24px;font-weight:900;letter-spacing:2px;color:#fff">Elige un héroe</div>
-            <div style="font-size:14px;color:#6b7280;max-width:300px;line-height:1.6">Haz clic en cualquier héroe de la izquierda para ver su build con mayor winrate</div>
+            <div style="font-size:14px;color:#6b7280;max-width:300px;line-height:1.6">Haz clic en cualquier héroe para ver los ítems con mayor winrate por fase del juego</div>
+            <div style="font-size:12px;color:#374151;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.1);border-radius:8px;padding:10px 18px">
+              🔗 Datos en tiempo real · STRATZ API
+            </div>
           </div>
-        `:`
+        ` : `
           <!-- BANNER -->
           <div style="position:relative;height:155px;overflow:hidden">
             <div style="position:absolute;inset:0;background-image:url(${HIMG(hero.n)});background-size:cover;background-position:center 25%;filter:blur(4px) brightness(.3);transform:scale(1.1)"></div>
@@ -310,42 +365,43 @@ function draw(){
 
           <!-- TABS -->
           <div style="display:flex;padding:0 28px;border-bottom:1px solid rgba(255,255,255,.07)">
-            <button class="tab${tab==='items'?' active':''}" onclick="setTab('items')">🗡️ Items por fase</button>
+            <button class="tab active">🗡️ Items por fase</button>
           </div>
 
           <!-- CONTENIDO -->
           <div style="padding:20px 28px 48px">
-            ${loading?`
+            ${loading ? `
               <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:60px;color:#6b7280;font-size:14px">
                 <div style="width:28px;height:28px;border:2px solid rgba(245,158,11,.15);border-top:2px solid #f59e0b;border-radius:50%;animation:spin .8s linear infinite"></div>
-                Cargando builds de ${hero.f}...
+                Consultando STRATZ para ${hero.f}...
               </div>
-            `:error?`
-              <div style="padding:18px 20px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);border-radius:10px;color:#f87171;font-size:13px;line-height:1.6">
-                ⚠️ Error al conectar con OpenDota: <strong>${error}</strong><br/>
-                <span style="font-size:11px;color:#9ca3af;margin-top:6px;display:block">Intenta de nuevo en unos segundos o recarga la página.</span>
+            ` : error ? `
+              <div style="padding:18px 20px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);border-radius:10px;color:#f87171;font-size:13px;line-height:1.7">
+                ⚠️ ${error}
               </div>
-            `:timings?`
+            ` : phases ? `
               <p style="font-size:13px;color:#4b5563;margin-bottom:18px">
-                Ítems con mayor <strong style="color:#f59e0b">winrate</strong> por fase del juego · basado en datos reales de OpenDota
+                Top 6 ítems con mayor <strong style="color:#f59e0b">winrate</strong> por fase · datos reales de STRATZ
               </p>
-              ${processTimings(timings).map(phaseCard).join('')}
-              <div style="font-size:11px;color:#374151;margin-top:8px;text-align:right">
-                Datos de: <a href="https://www.opendota.com" target="_blank" style="color:#f59e0b;text-decoration:none">OpenDota</a>
+              ${phases.map(phaseCard).join('')}
+              <div style="font-size:11px;color:#2d3748;margin-top:4px;text-align:right">
+                Datos de <a href="https://stratz.com" target="_blank" style="color:#4b5563;text-decoration:none">stratz.com</a>
               </div>
-            `:''}
+            ` : ''}
           </div>
         `}
       </main>
     </div>
   </div>`;
 
-  const si=document.getElementById('si');
-  if(si){si.addEventListener('input',e=>set({search:e.target.value}));si.focus();}
+  const si = document.getElementById('si');
+  if (si) {
+    si.addEventListener('input', e => set({search: e.target.value}));
+    si.focus();
+  }
 }
 
-function pick(id){const h=HEROES.find(x=>x.id===id);if(h)loadHero(h);}
-function setTab(t){set({tab:t});}
+function pick(id) { const h=HEROES.find(x=>x.id===id); if(h) loadHero(h); }
 
 draw();
 </script>
