@@ -3,407 +3,192 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Dota Build Intel</title>
+  <title>STRATZ Schema Explorer</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{background:#0a0c10;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif}
-    ::-webkit-scrollbar{width:4px}
-    ::-webkit-scrollbar-thumb{background:rgba(245,158,11,.4);border-radius:2px}
+    body{background:#0a0c10;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif;padding:24px}
+    h1{color:#f59e0b;margin-bottom:20px;font-size:20px;letter-spacing:2px}
+    h2{color:#f59e0b;font-size:15px;margin:20px 0 10px;letter-spacing:1px}
+    button{background:#f59e0b;color:#000;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:700;font-size:14px;font-family:inherit;margin-right:10px;margin-bottom:10px}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    button.sec{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3)}
+    pre{background:#0d1017;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:14px;font-size:12px;overflow:auto;max-height:400px;color:#9ca3af;white-space:pre-wrap;word-break:break-all;margin-top:8px}
+    .ok{color:#4ade80}
+    .err{color:#f87171}
+    .info{color:#60a5fa}
+    .spin{display:inline-block;animation:spin .8s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
-    @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-    .hrow{transition:background .12s;cursor:pointer;border:none;width:100%;text-align:left;background:transparent;border-left:3px solid transparent;display:flex;align-items:center;gap:9px;padding:7px 10px}
-    .hrow:hover{background:rgba(245,158,11,.08)}
-    .hrow.active{background:rgba(245,158,11,.14);border-left-color:#f59e0b}
-    .tab{background:transparent;border:none;border-bottom:2px solid transparent;color:#6b7280;padding:10px 18px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;margin-bottom:-1px;transition:all .2s}
-    .tab.active{color:#f59e0b;border-bottom-color:#f59e0b}
-    input{outline:none;transition:border-color .2s}
-    input:focus{border-color:rgba(245,158,11,.7)!important}
+    .card{background:#0d1017;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:16px;margin-bottom:16px}
+    input{background:rgba(255,255,255,.06);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:8px 12px;color:#e2e8f0;font-size:13px;font-family:inherit;width:100%;margin-bottom:8px;outline:none}
+    textarea{background:#0d1017;border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:12px;color:#e2e8f0;font-size:12px;font-family:monospace;width:100%;height:160px;outline:none;resize:vertical}
   </style>
 </head>
 <body>
-<div id="app"></div>
+<h1>◆ STRATZ SCHEMA EXPLORER</h1>
+<p style="color:#6b7280;font-size:13px;margin-bottom:20px">Herramienta de diagnóstico — descubre qué queries acepta la API de STRATZ</p>
+
+<div class="card">
+  <h2>PASO 1 — Verificar conexión</h2>
+  <button onclick="testConnection()">🔌 Test Conexión</button>
+  <div id="conn-result"></div>
+</div>
+
+<div class="card">
+  <h2>PASO 2 — Descubrir campos de heroStats</h2>
+  <button onclick="introspectHeroStats()">🔍 Ver campos de heroStats</button>
+  <div id="schema-result"></div>
+</div>
+
+<div class="card">
+  <h2>PASO 3 — Descubrir campos de heroes(heroId:)</h2>
+  <button onclick="introspectHeroes()">🔍 Ver campos de heroes</button>
+  <div id="heroes-result"></div>
+</div>
+
+<div class="card">
+  <h2>PASO 4 — Probar query manual</h2>
+  <textarea id="manual-query">{ heroStats { winWeek { heroId winCount matchCount } } }</textarea>
+  <button onclick="runManual()">▶ Ejecutar query</button>
+  <div id="manual-result"></div>
+</div>
+
+<div class="card">
+  <h2>PASO 5 — Buscar campos con "item" o "purchase"</h2>
+  <button onclick="findItemFields()">🎯 Buscar campos de items</button>
+  <div id="item-fields-result"></div>
+</div>
+
 <script>
-// ─── TOKEN & ENDPOINT ────────────────────────────────────────────────────
 const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJTdWJqZWN0IjoiMzIzZmQ3NzgtNzNhNC00YWFkLWE4OTctNWU1Y2E4MTRhYzBkIiwiU3RlYW1JZCI6IjE1NzIzNzI4MyIsIkFQSVVzZXIiOiJ0cnVlIiwibmJmIjoxNzcxNTM2MzE5LCJleHAiOjE4MDMwNzIzMTksImlhdCI6MTc3MTUzNjMxOSwiaXNzIjoiaHR0cHM6Ly9hcGkuc3RyYXR6LmNvbSJ9.rrLRWszzVEOqTJ0nfVI33jeUv6Q8gs3QI4vGE_DN4VA";
 const GQL = "https://api.stratz.com/graphql";
 
-// ─── HEROES ──────────────────────────────────────────────────────────────
-const RC={Carry:"#f59e0b",Support:"#60a5fa",Nuker:"#f87171",Disabler:"#a78bfa",Jungler:"#34d399",Durable:"#fb923c",Escape:"#e879f9",Pusher:"#4ade80",Initiator:"#fbbf24"};
-const HEROES=[
-  {id:1,n:"antimage",f:"Anti-Mage",r:["Carry","Escape"]},
-  {id:2,n:"axe",f:"Axe",r:["Initiator","Durable","Disabler"]},
-  {id:3,n:"bane",f:"Bane",r:["Support","Disabler","Nuker"]},
-  {id:4,n:"bloodseeker",f:"Bloodseeker",r:["Carry","Nuker","Disabler"]},
-  {id:5,n:"crystal_maiden",f:"Crystal Maiden",r:["Support","Disabler","Nuker"]},
-  {id:6,n:"drow_ranger",f:"Drow Ranger",r:["Carry","Disabler"]},
-  {id:7,n:"earthshaker",f:"Earthshaker",r:["Initiator","Disabler","Support"]},
-  {id:8,n:"juggernaut",f:"Juggernaut",r:["Carry","Pusher"]},
-  {id:9,n:"mirana",f:"Mirana",r:["Carry","Support","Escape"]},
-  {id:10,n:"morphling",f:"Morphling",r:["Carry","Escape","Nuker"]},
-  {id:11,n:"nevermore",f:"Shadow Fiend",r:["Carry","Nuker"]},
-  {id:12,n:"phantom_lancer",f:"Phantom Lancer",r:["Carry","Escape","Pusher"]},
-  {id:13,n:"puck",f:"Puck",r:["Escape","Nuker","Disabler"]},
-  {id:14,n:"pudge",f:"Pudge",r:["Disabler","Initiator","Durable"]},
-  {id:15,n:"razor",f:"Razor",r:["Carry","Durable","Nuker"]},
-  {id:16,n:"sand_king",f:"Sand King",r:["Initiator","Disabler","Nuker"]},
-  {id:17,n:"storm_spirit",f:"Storm Spirit",r:["Carry","Escape","Nuker"]},
-  {id:18,n:"sven",f:"Sven",r:["Carry","Initiator","Durable"]},
-  {id:19,n:"tiny",f:"Tiny",r:["Carry","Nuker","Initiator"]},
-  {id:20,n:"vengefulspirit",f:"Vengeful Spirit",r:["Support","Disabler"]},
-  {id:21,n:"windrunner",f:"Windranger",r:["Support","Carry","Escape"]},
-  {id:22,n:"zuus",f:"Zeus",r:["Nuker","Initiator"]},
-  {id:23,n:"kunkka",f:"Kunkka",r:["Carry","Support","Initiator"]},
-  {id:25,n:"lina",f:"Lina",r:["Support","Carry","Nuker"]},
-  {id:26,n:"lion",f:"Lion",r:["Support","Disabler","Nuker"]},
-  {id:27,n:"shadow_shaman",f:"Shadow Shaman",r:["Support","Disabler","Pusher"]},
-  {id:28,n:"slardar",f:"Slardar",r:["Carry","Initiator","Disabler"]},
-  {id:29,n:"tidehunter",f:"Tidehunter",r:["Initiator","Disabler","Durable"]},
-  {id:30,n:"witch_doctor",f:"Witch Doctor",r:["Support","Disabler","Nuker"]},
-  {id:31,n:"lich",f:"Lich",r:["Support","Nuker","Disabler"]},
-  {id:32,n:"riki",f:"Riki",r:["Carry","Escape","Disabler"]},
-  {id:33,n:"enigma",f:"Enigma",r:["Initiator","Disabler","Jungler"]},
-  {id:34,n:"tinker",f:"Tinker",r:["Nuker","Pusher"]},
-  {id:35,n:"sniper",f:"Sniper",r:["Carry","Nuker"]},
-  {id:36,n:"necrolyte",f:"Necrophos",r:["Carry","Support","Nuker"]},
-  {id:37,n:"warlock",f:"Warlock",r:["Support","Initiator","Nuker"]},
-  {id:38,n:"beastmaster",f:"Beastmaster",r:["Initiator","Jungler","Durable"]},
-  {id:39,n:"queenofpain",f:"Queen of Pain",r:["Carry","Escape","Nuker"]},
-  {id:40,n:"venomancer",f:"Venomancer",r:["Carry","Support","Nuker"]},
-  {id:41,n:"faceless_void",f:"Faceless Void",r:["Carry","Initiator","Disabler"]},
-  {id:42,n:"skeleton_king",f:"Wraith King",r:["Carry","Initiator","Durable"]},
-  {id:43,n:"death_prophet",f:"Death Prophet",r:["Carry","Pusher","Nuker"]},
-  {id:44,n:"phantom_assassin",f:"Phantom Assassin",r:["Carry","Escape"]},
-  {id:45,n:"pugna",f:"Pugna",r:["Support","Nuker","Pusher"]},
-  {id:46,n:"templar_assassin",f:"Templar Assassin",r:["Carry","Escape","Nuker"]},
-  {id:47,n:"viper",f:"Viper",r:["Carry","Nuker","Durable"]},
-  {id:48,n:"luna",f:"Luna",r:["Carry","Pusher"]},
-  {id:49,n:"dragon_knight",f:"Dragon Knight",r:["Carry","Durable","Pusher"]},
-  {id:50,n:"dazzle",f:"Dazzle",r:["Support","Nuker","Disabler"]},
-  {id:51,n:"rattletrap",f:"Clockwerk",r:["Initiator","Durable","Disabler"]},
-  {id:52,n:"leshrac",f:"Leshrac",r:["Carry","Support","Nuker"]},
-  {id:53,n:"furion",f:"Nature's Prophet",r:["Carry","Pusher","Jungler"]},
-  {id:54,n:"life_stealer",f:"Lifestealer",r:["Carry","Durable","Jungler"]},
-  {id:55,n:"dark_seer",f:"Dark Seer",r:["Initiator","Disabler","Support"]},
-  {id:56,n:"clinkz",f:"Clinkz",r:["Carry","Escape","Nuker"]},
-  {id:57,n:"omniknight",f:"Omniknight",r:["Support","Durable"]},
-  {id:58,n:"enchantress",f:"Enchantress",r:["Support","Carry","Jungler"]},
-  {id:59,n:"huskar",f:"Huskar",r:["Carry","Durable","Initiator"]},
-  {id:60,n:"night_stalker",f:"Night Stalker",r:["Carry","Initiator","Durable"]},
-  {id:61,n:"broodmother",f:"Broodmother",r:["Carry","Pusher","Escape"]},
-  {id:62,n:"bounty_hunter",f:"Bounty Hunter",r:["Carry","Support","Escape"]},
-  {id:63,n:"weaver",f:"Weaver",r:["Carry","Escape","Nuker"]},
-  {id:64,n:"jakiro",f:"Jakiro",r:["Support","Nuker","Disabler"]},
-  {id:65,n:"batrider",f:"Batrider",r:["Initiator","Disabler","Nuker"]},
-  {id:66,n:"chen",f:"Chen",r:["Support","Jungler","Pusher"]},
-  {id:67,n:"spectre",f:"Spectre",r:["Carry","Durable"]},
-  {id:68,n:"ancient_apparition",f:"Ancient Apparition",r:["Support","Nuker","Disabler"]},
-  {id:69,n:"doom_bringer",f:"Doom",r:["Carry","Jungler","Disabler"]},
-  {id:70,n:"ursa",f:"Ursa",r:["Carry","Jungler","Initiator"]},
-  {id:71,n:"spirit_breaker",f:"Spirit Breaker",r:["Initiator","Carry","Durable"]},
-  {id:72,n:"gyrocopter",f:"Gyrocopter",r:["Carry","Nuker","Initiator"]},
-  {id:73,n:"alchemist",f:"Alchemist",r:["Carry","Durable","Jungler"]},
-  {id:74,n:"invoker",f:"Invoker",r:["Carry","Nuker","Disabler"]},
-  {id:75,n:"silencer",f:"Silencer",r:["Carry","Support","Disabler"]},
-  {id:76,n:"obsidian_destroyer",f:"Outworld Destroyer",r:["Carry","Nuker","Disabler"]},
-  {id:77,n:"lycan",f:"Lycan",r:["Carry","Pusher","Jungler"]},
-  {id:78,n:"brewmaster",f:"Brewmaster",r:["Initiator","Nuker","Durable"]},
-  {id:79,n:"shadow_demon",f:"Shadow Demon",r:["Support","Disabler","Nuker"]},
-  {id:80,n:"lone_druid",f:"Lone Druid",r:["Carry","Pusher","Jungler"]},
-  {id:81,n:"chaos_knight",f:"Chaos Knight",r:["Carry","Initiator","Durable"]},
-  {id:82,n:"meepo",f:"Meepo",r:["Carry","Jungler","Escape"]},
-  {id:83,n:"treant",f:"Treant Protector",r:["Support","Initiator","Durable"]},
-  {id:84,n:"ogre_magi",f:"Ogre Magi",r:["Support","Durable","Nuker"]},
-  {id:85,n:"undying",f:"Undying",r:["Support","Initiator","Durable"]},
-  {id:86,n:"rubick",f:"Rubick",r:["Support","Nuker","Disabler"]},
-  {id:87,n:"disruptor",f:"Disruptor",r:["Support","Nuker","Disabler"]},
-  {id:88,n:"nyx_assassin",f:"Nyx Assassin",r:["Support","Nuker","Disabler"]},
-  {id:89,n:"naga_siren",f:"Naga Siren",r:["Carry","Disabler","Pusher"]},
-  {id:90,n:"keeper_of_the_light",f:"Keeper of the Light",r:["Support","Nuker","Pusher"]},
-  {id:91,n:"wisp",f:"Io",r:["Support","Escape"]},
-  {id:92,n:"visage",f:"Visage",r:["Support","Carry","Nuker"]},
-  {id:93,n:"slark",f:"Slark",r:["Carry","Escape","Disabler"]},
-  {id:94,n:"medusa",f:"Medusa",r:["Carry","Durable"]},
-  {id:95,n:"troll_warlord",f:"Troll Warlord",r:["Carry","Disabler"]},
-  {id:96,n:"centaur",f:"Centaur Warrunner",r:["Initiator","Durable","Disabler"]},
-  {id:97,n:"magnataur",f:"Magnus",r:["Initiator","Disabler","Carry"]},
-  {id:98,n:"shredder",f:"Timbersaw",r:["Carry","Escape","Nuker"]},
-  {id:99,n:"bristleback",f:"Bristleback",r:["Carry","Durable","Nuker"]},
-  {id:100,n:"tusk",f:"Tusk",r:["Support","Initiator","Disabler"]},
-  {id:101,n:"skywrath_mage",f:"Skywrath Mage",r:["Support","Nuker","Disabler"]},
-  {id:102,n:"abaddon",f:"Abaddon",r:["Support","Carry","Durable"]},
-  {id:103,n:"elder_titan",f:"Elder Titan",r:["Support","Initiator","Disabler"]},
-  {id:104,n:"legion_commander",f:"Legion Commander",r:["Carry","Initiator","Durable"]},
-  {id:105,n:"techies",f:"Techies",r:["Support","Nuker","Disabler"]},
-  {id:106,n:"ember_spirit",f:"Ember Spirit",r:["Carry","Escape","Nuker"]},
-  {id:107,n:"earth_spirit",f:"Earth Spirit",r:["Initiator","Disabler","Nuker"]},
-  {id:108,n:"abyssal_underlord",f:"Underlord",r:["Initiator","Durable","Pusher"]},
-  {id:109,n:"terrorblade",f:"Terrorblade",r:["Carry","Pusher","Escape"]},
-  {id:110,n:"phoenix",f:"Phoenix",r:["Support","Initiator","Nuker"]},
-  {id:111,n:"oracle",f:"Oracle",r:["Support","Nuker","Disabler"]},
-  {id:112,n:"over_mind",f:"Winter Wyvern",r:["Support","Nuker","Disabler"]},
-  {id:113,n:"arc_warden",f:"Arc Warden",r:["Carry","Escape","Nuker"]},
-  {id:114,n:"monkey_king",f:"Monkey King",r:["Carry","Escape","Initiator"]},
-  {id:119,n:"dark_willow",f:"Dark Willow",r:["Support","Escape","Nuker"]},
-  {id:120,n:"pangolier",f:"Pangolier",r:["Initiator","Disabler","Escape"]},
-  {id:121,n:"grimstroke",f:"Grimstroke",r:["Support","Nuker","Disabler"]},
-  {id:123,n:"hoodwink",f:"Hoodwink",r:["Support","Carry","Escape"]},
-  {id:126,n:"void_spirit",f:"Void Spirit",r:["Carry","Escape","Nuker"]},
-  {id:128,n:"snapfire",f:"Snapfire",r:["Support","Disabler","Nuker"]},
-  {id:129,n:"mars",f:"Mars",r:["Carry","Initiator","Durable"]},
-  {id:131,n:"ringmaster",f:"Ringmaster",r:["Support","Disabler"]},
-  {id:135,n:"dawnbreaker",f:"Dawnbreaker",r:["Carry","Support","Initiator"]},
-  {id:136,n:"marci",f:"Marci",r:["Support","Carry","Initiator"]},
-  {id:137,n:"primal_beast",f:"Primal Beast",r:["Initiator","Durable","Nuker"]},
-  {id:138,n:"muerta",f:"Muerta",r:["Carry","Support","Disabler"]},
-  {id:145,n:"kez",f:"Kez",r:["Carry","Escape","Nuker"]},
-].sort((a,b)=>a.f.localeCompare(b.f));
+function log(elId, html) { document.getElementById(elId).innerHTML = html; }
+function pre(data) { return `<pre>${JSON.stringify(data,null,2)}</pre>`; }
 
-const HIMG = n=>`https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/${n}.png`;
-const IIMG = n=>`https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/items/${n}.png`;
-
-// ─── ITEM ID MAP (STRATZ devuelve IDs numéricos) ─────────────────────────
-// Se carga dinámicamente desde la API de STRATZ
-let ITEM_MAP = {}; // id -> {shortName, displayName}
-
-async function loadItemMap() {
-  if (Object.keys(ITEM_MAP).length > 0) return;
-  try {
-    const q = `{ constants { items { id displayName shortName } } }`;
-    const res = await gql(q);
-    (res.data?.constants?.items || []).forEach(it => {
-      ITEM_MAP[it.id] = { name: it.displayName || it.shortName, short: it.shortName };
-    });
-  } catch(e) { console.warn('No se pudo cargar item map:', e); }
-}
-
-// ─── STATE ───────────────────────────────────────────────────────────────
-let S={search:'',hero:null,loading:false,error:null,phases:null,tab:'items'};
-const set=p=>{Object.assign(S,p);draw()};
-
-// ─── STRATZ GRAPHQL ──────────────────────────────────────────────────────
 async function gql(query) {
   const res = await fetch(GQL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${TOKEN}`
-    },
-    body: JSON.stringify({ query })
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':`Bearer ${TOKEN}`},
+    body:JSON.stringify({query})
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  if(!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`);
+  const j = await res.json();
+  if(j.errors) throw new Error(j.errors.map(e=>e.message).join('\n'));
+  return j;
 }
 
-// Query principal: items del héroe por timing con winrate
-// heroStats -> itemFullPurchase devuelve {itemId, matchCount, winCount, time (minutos)}
-function buildQuery(heroId) {
-  return `{
-    heroStats {
-      itemFullPurchase(heroId: ${heroId}, take: 200) {
-        itemId
-        matchCount
-        winCount
-        time
-      }
-    }
-  }`;
-}
-
-async function loadHero(hero) {
-  set({hero, loading:true, error:null, phases:null, search:'', tab:'items'});
+async function testConnection() {
+  log('conn-result','<span class="spin">⏳</span> Conectando...');
   try {
-    await loadItemMap();
-    const data = await gql(buildQuery(hero.id));
-    const items = data?.data?.heroStats?.itemFullPurchase || [];
+    const r = await gql('{ __typename }');
+    log('conn-result',`<span class="ok">✅ CONEXIÓN OK</span><pre>${JSON.stringify(r,null,2)}</pre>`);
+  } catch(e) {
+    log('conn-result',`<span class="err">❌ ERROR: ${e.message}</span>`);
+  }
+}
 
-    if (!Array.isArray(items) || items.length === 0) {
-      set({loading:false, error:'La API no devolvió datos para este héroe. Intenta con otro.'});
+async function introspectHeroStats() {
+  log('schema-result','<span class="spin">⏳</span> Analizando schema...');
+  try {
+    const r = await gql(`{
+      __type(name: "HeroStatType") {
+        name
+        fields {
+          name
+          description
+          args { name type { name kind ofType { name kind ofType { name kind } } } }
+          type { name kind ofType { name kind } }
+        }
+      }
+    }`);
+    const fields = r.data?.__type?.fields || [];
+    if(fields.length === 0) {
+      log('schema-result', `<span class="err">❌ No se encontró HeroStatType</span>${pre(r)}`);
       return;
     }
-
-    // Group by time phases (minutes)
-    const phases = [
-      {label:'Inicio', icon:'🌅', range:'0-10 min',  min:0,  max:10},
-      {label:'Early',  icon:'⚡', range:'10-20 min', min:10, max:20},
-      {label:'Mid',    icon:'⚔️', range:'20-30 min', min:20, max:30},
-      {label:'Late',   icon:'👑', range:'30+ min',   min:30, max:999},
-    ].map(p => {
-      // Aggregate same items in this time window
-      const agg = {};
-      items
-        .filter(it => it.time >= p.min && it.time < p.max)
-        .forEach(it => {
-          if (!agg[it.itemId]) agg[it.itemId] = {matches:0, wins:0};
-          agg[it.itemId].matches += it.matchCount;
-          agg[it.itemId].wins   += it.winCount;
-        });
-
-      const list = Object.entries(agg)
-        .filter(([,v]) => v.matches >= 50)
-        .map(([id, v]) => ({
-          id: parseInt(id),
-          wr: v.wins / v.matches,
-          matches: v.matches,
-          name: ITEM_MAP[id]?.name || `Item ${id}`,
-          short: ITEM_MAP[id]?.short || `item_${id}`,
-        }))
-        .sort((a,b) => b.wr - a.wr)
-        .slice(0, 6);
-
-      return {...p, list};
-    });
-
-    set({loading:false, phases});
+    const fieldList = fields.map(f => {
+      const args = f.args?.map(a=>a.name).join(', ') || '';
+      return `<strong style="color:#f59e0b">${f.name}</strong>(${args}) → ${f.type?.name||f.type?.ofType?.name||'?'}`;
+    }).join('<br/>');
+    log('schema-result', `<span class="ok">✅ ${fields.length} campos encontrados en HeroStatType:</span><div style="background:#0d1017;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:14px;margin-top:8px;font-size:12px;line-height:2">${fieldList}</div>`);
   } catch(e) {
-    set({loading:false, error:`Error: ${e.message}`});
+    log('schema-result', `<span class="err">❌ ${e.message}</span>`);
   }
 }
 
-// ─── RENDER ──────────────────────────────────────────────────────────────
-function wrBadge(wr) {
-  const p = Math.round(wr*100);
-  const c = p>=55?'#4ade80':p>=50?'#fbbf24':'#f87171';
-  return `<span style="color:${c};font-weight:700;font-family:monospace;font-size:13px">${p}% WR</span>`;
-}
-
-function itemCard(it, i) {
-  const imgUrl = IIMG(it.short);
-  return `
-    <div style="flex:1 1 110px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;border-right:1px solid rgba(255,255,255,.04);text-align:center">
-      <span style="font-size:10px;color:${i===0?'#f59e0b':'#374151'};font-family:monospace;font-weight:700">#${i+1}</span>
-      <img src="${imgUrl}" style="width:72px;height:52px;object-fit:cover;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:#1a2030"
-           onerror="this.style.opacity='.25'" title="${it.name}"/>
-      <div style="font-size:11px;color:#9ca3af;max-width:100px;line-height:1.3;text-transform:capitalize">${it.name}</div>
-      ${wrBadge(it.wr)}
-      <div style="font-size:10px;color:#374151;font-family:monospace">${it.matches.toLocaleString()} partidas</div>
-    </div>`;
-}
-
-function phaseCard(p) {
-  return `
-    <div style="background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:12px;overflow:hidden;margin-bottom:16px">
-      <div style="padding:11px 16px;background:rgba(255,255,255,.02);border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:13px;font-weight:800;letter-spacing:1.5px;color:#f59e0b;text-transform:uppercase">${p.icon} ${p.label} GAME</span>
-        <span style="font-size:10px;color:#374151">${p.range} · mín. 50 partidas</span>
-      </div>
-      ${p.list.length === 0
-        ? `<div style="padding:18px;color:#374151;font-size:12px;text-align:center;font-style:italic">Sin datos suficientes en esta fase</div>`
-        : `<div style="display:flex;flex-wrap:wrap">${p.list.map((it,i) => itemCard(it,i)).join('')}</div>`
+async function introspectHeroes() {
+  log('heroes-result','<span class="spin">⏳</span> Analizando...');
+  try {
+    // Try to find the Hero type fields
+    const r = await gql(`{
+      __type(name: "HeroType") {
+        name
+        fields {
+          name
+          description
+          args { name type { name kind ofType { name } } }
+          type { name kind ofType { name kind } }
+        }
       }
-    </div>`;
-}
-
-function draw() {
-  const {search, hero, loading, error, phases} = S;
-  const list = search ? HEROES.filter(h=>h.f.toLowerCase().includes(search.toLowerCase())) : HEROES;
-
-  document.getElementById('app').innerHTML = `
-  <div style="display:flex;flex-direction:column;min-height:100vh">
-
-    <!-- HEADER -->
-    <header style="display:flex;align-items:center;justify-content:space-between;padding:13px 24px;background:#0d1017;border-bottom:1px solid rgba(245,158,11,.2);flex-shrink:0;position:sticky;top:0;z-index:100">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span style="color:#f59e0b;font-size:18px">◆</span>
-        <span style="font-size:16px;font-weight:900;letter-spacing:3px;color:#fff">DOTA BUILD INTEL</span>
-      </div>
-      <span style="font-size:11px;color:#374151">${HEROES.length} héroes · STRATZ API</span>
-    </header>
-
-    <div style="display:flex;flex:1;height:calc(100vh - 50px);overflow:hidden">
-
-      <!-- SIDEBAR -->
-      <aside style="width:250px;background:#0d1017;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0">
-        <div style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06)">
-          <div style="position:relative">
-            <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:13px">🔍</span>
-            <input id="si"
-              style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:8px 8px 8px 30px;color:#e2e8f0;font-size:13px;font-family:inherit"
-              placeholder="Buscar héroe..." value="${search}" autocomplete="off"/>
-          </div>
-          ${search ? `<div style="font-size:11px;color:#4b5563;margin-top:4px;padding-left:2px">${list.length} resultado${list.length!==1?'s':''}</div>` : ''}
-        </div>
-        <div style="flex:1;overflow-y:auto">
-          ${list.map(h => `
-            <button class="hrow${hero?.id===h.id?' active':''}" onclick="pick(${h.id})">
-              <img src="${HIMG(h.n)}" style="width:46px;height:26px;border-radius:4px;object-fit:cover;background:#1a2030;flex-shrink:0" onerror="this.style.opacity='.1'"/>
-              <div style="flex:1;min-width:0">
-                <div style="font-size:12px;color:${hero?.id===h.id?'#f59e0b':'#d1d5db'};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.f}</div>
-                <div style="display:flex;gap:4px;margin-top:2px">
-                  ${h.r.slice(0,2).map(r=>`<span style="font-size:9px;color:${RC[r]||'#555'};font-weight:700">${r}</span>`).join('')}
-                </div>
-              </div>
-            </button>`).join('')}
-        </div>
-      </aside>
-
-      <!-- MAIN -->
-      <main style="flex:1;overflow-y:auto;min-width:0">
-        ${!hero ? `
-          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;padding:40px;text-align:center">
-            <div style="font-size:64px">⚔️</div>
-            <div style="font-size:24px;font-weight:900;letter-spacing:2px;color:#fff">Elige un héroe</div>
-            <div style="font-size:14px;color:#6b7280;max-width:300px;line-height:1.6">Haz clic en cualquier héroe para ver los ítems con mayor winrate por fase del juego</div>
-            <div style="font-size:12px;color:#374151;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.1);border-radius:8px;padding:10px 18px">
-              🔗 Datos en tiempo real · STRATZ API
-            </div>
-          </div>
-        ` : `
-          <!-- BANNER -->
-          <div style="position:relative;height:155px;overflow:hidden">
-            <div style="position:absolute;inset:0;background-image:url(${HIMG(hero.n)});background-size:cover;background-position:center 25%;filter:blur(4px) brightness(.3);transform:scale(1.1)"></div>
-            <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.1),#0a0c10)"></div>
-            <div style="position:relative;z-index:1;padding:18px 28px;display:flex;align-items:flex-end;gap:18px;height:100%">
-              <img src="${HIMG(hero.n)}" style="width:88px;height:50px;border-radius:6px;object-fit:cover;border:2px solid rgba(245,158,11,.5)" onerror="this.style.display='none'"/>
-              <div>
-                <h1 style="font-size:28px;font-weight:900;letter-spacing:2px;color:#fff;text-transform:uppercase;text-shadow:0 2px 12px rgba(0,0,0,.9)">${hero.f}</h1>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px">
-                  ${hero.r.map(r=>`<span style="font-size:10px;border:1px solid ${RC[r]||'#555'};border-radius:100px;padding:2px 9px;font-weight:700;color:${RC[r]||'#aaa'}">${r}</span>`).join('')}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- TABS -->
-          <div style="display:flex;padding:0 28px;border-bottom:1px solid rgba(255,255,255,.07)">
-            <button class="tab active">🗡️ Items por fase</button>
-          </div>
-
-          <!-- CONTENIDO -->
-          <div style="padding:20px 28px 48px">
-            ${loading ? `
-              <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:60px;color:#6b7280;font-size:14px">
-                <div style="width:28px;height:28px;border:2px solid rgba(245,158,11,.15);border-top:2px solid #f59e0b;border-radius:50%;animation:spin .8s linear infinite"></div>
-                Consultando STRATZ para ${hero.f}...
-              </div>
-            ` : error ? `
-              <div style="padding:18px 20px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);border-radius:10px;color:#f87171;font-size:13px;line-height:1.7">
-                ⚠️ ${error}
-              </div>
-            ` : phases ? `
-              <p style="font-size:13px;color:#4b5563;margin-bottom:18px">
-                Top 6 ítems con mayor <strong style="color:#f59e0b">winrate</strong> por fase · datos reales de STRATZ
-              </p>
-              ${phases.map(phaseCard).join('')}
-              <div style="font-size:11px;color:#2d3748;margin-top:4px;text-align:right">
-                Datos de <a href="https://stratz.com" target="_blank" style="color:#4b5563;text-decoration:none">stratz.com</a>
-              </div>
-            ` : ''}
-          </div>
-        `}
-      </main>
-    </div>
-  </div>`;
-
-  const si = document.getElementById('si');
-  if (si) {
-    si.addEventListener('input', e => set({search: e.target.value}));
-    si.focus();
+    }`);
+    const fields = r.data?.__type?.fields || [];
+    const fieldList = fields.map(f => {
+      const args = f.args?.map(a=>a.name).join(', ') || '';
+      return `<strong style="color:#60a5fa">${f.name}</strong>(${args}) → ${f.type?.name||f.type?.ofType?.name||'?'}`;
+    }).join('<br/>');
+    log('heroes-result', `<span class="ok">✅ ${fields.length} campos en HeroType:</span><div style="background:#0d1017;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:14px;margin-top:8px;font-size:12px;line-height:2">${fieldList}</div>`);
+  } catch(e) {
+    log('heroes-result', `<span class="err">❌ ${e.message}</span>`);
   }
 }
 
-function pick(id) { const h=HEROES.find(x=>x.id===id); if(h) loadHero(h); }
+async function runManual() {
+  const q = document.getElementById('manual-query').value.trim();
+  if(!q) return;
+  log('manual-result','<span class="spin">⏳</span> Ejecutando...');
+  try {
+    const r = await gql(q);
+    log('manual-result', `<span class="ok">✅ OK</span><pre>${JSON.stringify(r,null,2).slice(0,3000)}</pre>`);
+  } catch(e) {
+    log('manual-result', `<span class="err">❌ ${e.message}</span>`);
+  }
+}
 
-draw();
+async function findItemFields() {
+  log('item-fields-result','<span class="spin">⏳</span> Buscando en schema completo...');
+  try {
+    // Get full schema types
+    const r = await gql(`{
+      __schema {
+        types {
+          name
+          fields {
+            name
+            args { name }
+          }
+        }
+      }
+    }`);
+    const types = r.data?.__schema?.types || [];
+    const results = [];
+    for(const t of types) {
+      if(!t.fields) continue;
+      for(const f of t.fields) {
+        const fn = f.name.toLowerCase();
+        if(fn.includes('item') || fn.includes('purchase') || fn.includes('boot')) {
+          results.push(`<strong style="color:#f59e0b">${t.name}</strong>.<strong style="color:#4ade80">${f.name}</strong>(${(f.args||[]).map(a=>a.name).join(', ')})`);
+        }
+      }
+    }
+    if(results.length === 0) {
+      log('item-fields-result', `<span class="err">❌ No se encontraron campos de items/purchase en el schema</span>${pre(r).slice(0,500)}`);
+    } else {
+      log('item-fields-result', `<span class="ok">✅ ${results.length} campos encontrados:</span><div style="background:#0d1017;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:14px;margin-top:8px;font-size:12px;line-height:2">${results.join('<br/>')}</div>`);
+    }
+  } catch(e) {
+    log('item-fields-result', `<span class="err">❌ ${e.message}</span>`);
+  }
+}
 </script>
 </body>
 </html>
