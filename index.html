@@ -1,293 +1,255 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Dota Build Intel</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0a0c10; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; }
-    ::-webkit-scrollbar { width: 4px; }
-    ::-webkit-scrollbar-thumb { background: rgba(245,158,11,0.4); border-radius: 2px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .hrow { transition: background 0.15s; cursor: pointer; border: none; width: 100%; text-align: left; }
-    .hrow:hover { background: rgba(245,158,11,0.1); }
-    .tab-btn { background: transparent; border: none; border-bottom: 2px solid transparent; color: #6b7280; padding: 10px 18px; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; transition: all 0.2s; margin-bottom: -1px; }
-    .tab-btn.active { color: #f59e0b; border-bottom-color: #f59e0b; }
-    input { outline: none; }
-    input:focus { border-color: rgba(245,158,11,0.7) !important; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#0a0c10;color:#e2e8f0;font-family:'Segoe UI',system-ui,sans-serif}
+    ::-webkit-scrollbar{width:4px}
+    ::-webkit-scrollbar-thumb{background:rgba(245,158,11,.4);border-radius:2px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .hrow{transition:background .15s;cursor:pointer;border:none;width:100%;text-align:left;background:transparent;border-left:3px solid transparent}
+    .hrow:hover{background:rgba(245,158,11,.08)!important}
+    .hrow.active{background:rgba(245,158,11,.14)!important;border-left-color:#f59e0b!important}
+    .tab{background:transparent;border:none;border-bottom:2px solid transparent;color:#6b7280;padding:10px 18px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;margin-bottom:-1px;transition:all .2s}
+    .tab.active{color:#f59e0b;border-bottom-color:#f59e0b}
+    input{outline:none}
+    input:focus{border-color:rgba(245,158,11,.7)!important}
+    button{font-family:inherit}
   </style>
 </head>
 <body>
 <div id="app"></div>
-
 <script>
-const HEROES = [
-  {id:1,name:"antimage",full:"Anti-Mage",roles:["Carry","Escape"]},
-  {id:2,name:"axe",full:"Axe",roles:["Initiator","Durable","Disabler"]},
-  {id:3,name:"bane",full:"Bane",roles:["Support","Disabler","Nuker"]},
-  {id:4,name:"bloodseeker",full:"Bloodseeker",roles:["Carry","Nuker"]},
-  {id:5,name:"crystal_maiden",full:"Crystal Maiden",roles:["Support","Disabler"]},
-  {id:6,name:"drow_ranger",full:"Drow Ranger",roles:["Carry"]},
-  {id:7,name:"earthshaker",full:"Earthshaker",roles:["Initiator","Disabler"]},
-  {id:8,name:"juggernaut",full:"Juggernaut",roles:["Carry","Pusher"]},
-  {id:9,name:"mirana",full:"Mirana",roles:["Carry","Support","Escape"]},
-  {id:10,name:"morphling",full:"Morphling",roles:["Carry","Escape"]},
-  {id:11,name:"nevermore",full:"Shadow Fiend",roles:["Carry","Nuker"]},
-  {id:12,name:"phantom_lancer",full:"Phantom Lancer",roles:["Carry","Escape"]},
-  {id:13,name:"puck",full:"Puck",roles:["Escape","Nuker","Disabler"]},
-  {id:14,name:"pudge",full:"Pudge",roles:["Disabler","Initiator","Durable"]},
-  {id:15,name:"razor",full:"Razor",roles:["Carry","Durable"]},
-  {id:16,name:"sand_king",full:"Sand King",roles:["Initiator","Disabler"]},
-  {id:17,name:"storm_spirit",full:"Storm Spirit",roles:["Carry","Escape","Nuker"]},
-  {id:18,name:"sven",full:"Sven",roles:["Carry","Initiator","Durable"]},
-  {id:19,name:"tiny",full:"Tiny",roles:["Carry","Nuker","Initiator"]},
-  {id:20,name:"vengefulspirit",full:"Vengeful Spirit",roles:["Support","Disabler"]},
-  {id:21,name:"windrunner",full:"Windranger",roles:["Support","Carry","Escape"]},
-  {id:22,name:"zuus",full:"Zeus",roles:["Nuker"]},
-  {id:23,name:"kunkka",full:"Kunkka",roles:["Carry","Support","Initiator"]},
-  {id:25,name:"lina",full:"Lina",roles:["Support","Carry","Nuker"]},
-  {id:26,name:"lion",full:"Lion",roles:["Support","Disabler","Nuker"]},
-  {id:27,name:"shadow_shaman",full:"Shadow Shaman",roles:["Support","Disabler","Pusher"]},
-  {id:28,name:"slardar",full:"Slardar",roles:["Carry","Initiator","Disabler"]},
-  {id:29,name:"tidehunter",full:"Tidehunter",roles:["Initiator","Disabler","Durable"]},
-  {id:30,name:"witch_doctor",full:"Witch Doctor",roles:["Support","Disabler","Nuker"]},
-  {id:31,name:"lich",full:"Lich",roles:["Support","Nuker","Disabler"]},
-  {id:32,name:"riki",full:"Riki",roles:["Carry","Escape","Disabler"]},
-  {id:33,name:"enigma",full:"Enigma",roles:["Initiator","Disabler","Jungler"]},
-  {id:34,name:"tinker",full:"Tinker",roles:["Nuker","Pusher"]},
-  {id:35,name:"sniper",full:"Sniper",roles:["Carry","Nuker"]},
-  {id:36,name:"necrolyte",full:"Necrophos",roles:["Carry","Support","Nuker"]},
-  {id:37,name:"warlock",full:"Warlock",roles:["Support","Initiator","Nuker"]},
-  {id:38,name:"beastmaster",full:"Beastmaster",roles:["Initiator","Jungler","Durable"]},
-  {id:39,name:"queenofpain",full:"Queen of Pain",roles:["Carry","Escape","Nuker"]},
-  {id:40,name:"venomancer",full:"Venomancer",roles:["Carry","Support","Nuker"]},
-  {id:41,name:"faceless_void",full:"Faceless Void",roles:["Carry","Initiator","Disabler"]},
-  {id:42,name:"skeleton_king",full:"Wraith King",roles:["Carry","Initiator","Durable"]},
-  {id:43,name:"death_prophet",full:"Death Prophet",roles:["Carry","Pusher","Nuker"]},
-  {id:44,name:"phantom_assassin",full:"Phantom Assassin",roles:["Carry","Escape"]},
-  {id:45,name:"pugna",full:"Pugna",roles:["Support","Nuker","Pusher"]},
-  {id:46,name:"templar_assassin",full:"Templar Assassin",roles:["Carry","Escape","Nuker"]},
-  {id:47,name:"viper",full:"Viper",roles:["Carry","Nuker","Durable"]},
-  {id:48,name:"luna",full:"Luna",roles:["Carry","Pusher"]},
-  {id:49,name:"dragon_knight",full:"Dragon Knight",roles:["Carry","Durable","Pusher"]},
-  {id:50,name:"dazzle",full:"Dazzle",roles:["Support","Nuker","Disabler"]},
-  {id:51,name:"rattletrap",full:"Clockwerk",roles:["Initiator","Durable","Disabler"]},
-  {id:52,name:"leshrac",full:"Leshrac",roles:["Carry","Support","Nuker"]},
-  {id:53,name:"furion",full:"Nature's Prophet",roles:["Carry","Pusher","Jungler"]},
-  {id:54,name:"life_stealer",full:"Lifestealer",roles:["Carry","Durable","Jungler"]},
-  {id:55,name:"dark_seer",full:"Dark Seer",roles:["Initiator","Disabler","Support"]},
-  {id:56,name:"clinkz",full:"Clinkz",roles:["Carry","Escape","Nuker"]},
-  {id:57,name:"omniknight",full:"Omniknight",roles:["Support","Durable"]},
-  {id:58,name:"enchantress",full:"Enchantress",roles:["Support","Carry","Jungler"]},
-  {id:59,name:"huskar",full:"Huskar",roles:["Carry","Durable","Initiator"]},
-  {id:60,name:"night_stalker",full:"Night Stalker",roles:["Carry","Initiator","Durable"]},
-  {id:61,name:"broodmother",full:"Broodmother",roles:["Carry","Pusher","Escape"]},
-  {id:62,name:"bounty_hunter",full:"Bounty Hunter",roles:["Carry","Support","Escape"]},
-  {id:63,name:"weaver",full:"Weaver",roles:["Carry","Escape","Nuker"]},
-  {id:64,name:"jakiro",full:"Jakiro",roles:["Support","Nuker","Disabler"]},
-  {id:65,name:"batrider",full:"Batrider",roles:["Initiator","Disabler","Nuker"]},
-  {id:66,name:"chen",full:"Chen",roles:["Support","Jungler","Pusher"]},
-  {id:67,name:"spectre",full:"Spectre",roles:["Carry","Durable"]},
-  {id:68,name:"ancient_apparition",full:"Ancient Apparition",roles:["Support","Nuker","Disabler"]},
-  {id:69,name:"doom_bringer",full:"Doom",roles:["Carry","Jungler","Disabler"]},
-  {id:70,name:"ursa",full:"Ursa",roles:["Carry","Jungler","Initiator"]},
-  {id:71,name:"spirit_breaker",full:"Spirit Breaker",roles:["Initiator","Carry","Durable"]},
-  {id:72,name:"gyrocopter",full:"Gyrocopter",roles:["Carry","Nuker","Initiator"]},
-  {id:73,name:"alchemist",full:"Alchemist",roles:["Carry","Durable","Jungler"]},
-  {id:74,name:"invoker",full:"Invoker",roles:["Carry","Nuker","Disabler"]},
-  {id:75,name:"silencer",full:"Silencer",roles:["Carry","Support","Disabler"]},
-  {id:76,name:"obsidian_destroyer",full:"Outworld Destroyer",roles:["Carry","Nuker","Disabler"]},
-  {id:77,name:"lycan",full:"Lycan",roles:["Carry","Pusher","Jungler"]},
-  {id:78,name:"brewmaster",full:"Brewmaster",roles:["Initiator","Nuker","Durable"]},
-  {id:79,name:"shadow_demon",full:"Shadow Demon",roles:["Support","Disabler","Nuker"]},
-  {id:80,name:"lone_druid",full:"Lone Druid",roles:["Carry","Pusher","Jungler"]},
-  {id:81,name:"chaos_knight",full:"Chaos Knight",roles:["Carry","Initiator","Durable"]},
-  {id:82,name:"meepo",full:"Meepo",roles:["Carry","Jungler","Escape"]},
-  {id:83,name:"treant",full:"Treant Protector",roles:["Support","Initiator","Durable"]},
-  {id:84,name:"ogre_magi",full:"Ogre Magi",roles:["Support","Durable","Nuker"]},
-  {id:85,name:"undying",full:"Undying",roles:["Support","Initiator","Durable"]},
-  {id:86,name:"rubick",full:"Rubick",roles:["Support","Nuker","Disabler"]},
-  {id:87,name:"disruptor",full:"Disruptor",roles:["Support","Nuker","Disabler"]},
-  {id:88,name:"nyx_assassin",full:"Nyx Assassin",roles:["Support","Nuker","Disabler"]},
-  {id:89,name:"naga_siren",full:"Naga Siren",roles:["Carry","Disabler","Pusher"]},
-  {id:90,name:"keeper_of_the_light",full:"Keeper of the Light",roles:["Support","Nuker","Pusher"]},
-  {id:91,name:"wisp",full:"Io",roles:["Support","Escape"]},
-  {id:92,name:"visage",full:"Visage",roles:["Support","Carry","Nuker"]},
-  {id:93,name:"slark",full:"Slark",roles:["Carry","Escape","Disabler"]},
-  {id:94,name:"medusa",full:"Medusa",roles:["Carry","Durable"]},
-  {id:95,name:"troll_warlord",full:"Troll Warlord",roles:["Carry","Disabler"]},
-  {id:96,name:"centaur",full:"Centaur Warrunner",roles:["Initiator","Durable","Disabler"]},
-  {id:97,name:"magnataur",full:"Magnus",roles:["Initiator","Disabler","Carry"]},
-  {id:98,name:"shredder",full:"Timbersaw",roles:["Carry","Escape","Nuker"]},
-  {id:99,name:"bristleback",full:"Bristleback",roles:["Carry","Durable","Nuker"]},
-  {id:100,name:"tusk",full:"Tusk",roles:["Support","Initiator","Disabler"]},
-  {id:101,name:"skywrath_mage",full:"Skywrath Mage",roles:["Support","Nuker","Disabler"]},
-  {id:102,name:"abaddon",full:"Abaddon",roles:["Support","Carry","Durable"]},
-  {id:103,name:"elder_titan",full:"Elder Titan",roles:["Support","Initiator","Disabler"]},
-  {id:104,name:"legion_commander",full:"Legion Commander",roles:["Carry","Initiator","Durable"]},
-  {id:105,name:"techies",full:"Techies",roles:["Support","Nuker","Disabler"]},
-  {id:106,name:"ember_spirit",full:"Ember Spirit",roles:["Carry","Escape","Nuker"]},
-  {id:107,name:"earth_spirit",full:"Earth Spirit",roles:["Initiator","Disabler","Nuker"]},
-  {id:108,name:"abyssal_underlord",full:"Underlord",roles:["Initiator","Durable","Pusher"]},
-  {id:109,name:"terrorblade",full:"Terrorblade",roles:["Carry","Pusher","Escape"]},
-  {id:110,name:"phoenix",full:"Phoenix",roles:["Support","Initiator","Nuker"]},
-  {id:111,name:"oracle",full:"Oracle",roles:["Support","Nuker","Disabler"]},
-  {id:112,name:"over_mind",full:"Winter Wyvern",roles:["Support","Nuker","Disabler"]},
-  {id:113,name:"arc_warden",full:"Arc Warden",roles:["Carry","Escape","Nuker"]},
-  {id:114,name:"monkey_king",full:"Monkey King",roles:["Carry","Escape","Initiator"]},
-  {id:119,name:"dark_willow",full:"Dark Willow",roles:["Support","Escape","Nuker"]},
-  {id:120,name:"pangolier",full:"Pangolier",roles:["Initiator","Disabler","Escape"]},
-  {id:121,name:"grimstroke",full:"Grimstroke",roles:["Support","Nuker","Disabler"]},
-  {id:123,name:"hoodwink",full:"Hoodwink",roles:["Support","Carry","Escape"]},
-  {id:126,name:"void_spirit",full:"Void Spirit",roles:["Carry","Escape","Nuker"]},
-  {id:128,name:"snapfire",full:"Snapfire",roles:["Support","Disabler","Nuker"]},
-  {id:129,name:"mars",full:"Mars",roles:["Carry","Initiator","Durable"]},
-  {id:131,name:"ringmaster",full:"Ringmaster",roles:["Support","Disabler"]},
-  {id:135,name:"dawnbreaker",full:"Dawnbreaker",roles:["Carry","Support","Initiator"]},
-  {id:136,name:"marci",full:"Marci",roles:["Support","Carry","Initiator"]},
-  {id:137,name:"primal_beast",full:"Primal Beast",roles:["Initiator","Durable","Nuker"]},
-  {id:138,name:"muerta",full:"Muerta",roles:["Carry","Support","Disabler"]},
-  {id:145,name:"kez",full:"Kez",roles:["Carry","Escape","Nuker"]},
-].sort((a,b) => a.full.localeCompare(b.full));
+// ─── HEROES ──────────────────────────────────────────────────────────────
+const RC={Carry:"#f59e0b",Support:"#60a5fa",Nuker:"#f87171",Disabler:"#a78bfa",Jungler:"#34d399",Durable:"#fb923c",Escape:"#e879f9",Pusher:"#4ade80",Initiator:"#fbbf24"};
+const HEROES=[
+  {id:1,n:"antimage",f:"Anti-Mage",r:["Carry","Escape"]},
+  {id:2,n:"axe",f:"Axe",r:["Initiator","Durable","Disabler"]},
+  {id:3,n:"bane",f:"Bane",r:["Support","Disabler","Nuker"]},
+  {id:4,n:"bloodseeker",f:"Bloodseeker",r:["Carry","Nuker","Disabler"]},
+  {id:5,n:"crystal_maiden",f:"Crystal Maiden",r:["Support","Disabler","Nuker"]},
+  {id:6,n:"drow_ranger",f:"Drow Ranger",r:["Carry","Disabler"]},
+  {id:7,n:"earthshaker",f:"Earthshaker",r:["Initiator","Disabler","Support"]},
+  {id:8,n:"juggernaut",f:"Juggernaut",r:["Carry","Pusher"]},
+  {id:9,n:"mirana",f:"Mirana",r:["Carry","Support","Escape"]},
+  {id:10,n:"morphling",f:"Morphling",r:["Carry","Escape","Nuker"]},
+  {id:11,n:"nevermore",f:"Shadow Fiend",r:["Carry","Nuker"]},
+  {id:12,n:"phantom_lancer",f:"Phantom Lancer",r:["Carry","Escape","Pusher"]},
+  {id:13,n:"puck",f:"Puck",r:["Escape","Nuker","Disabler"]},
+  {id:14,n:"pudge",f:"Pudge",r:["Disabler","Initiator","Durable"]},
+  {id:15,n:"razor",f:"Razor",r:["Carry","Durable","Nuker"]},
+  {id:16,n:"sand_king",f:"Sand King",r:["Initiator","Disabler","Nuker"]},
+  {id:17,n:"storm_spirit",f:"Storm Spirit",r:["Carry","Escape","Nuker"]},
+  {id:18,n:"sven",f:"Sven",r:["Carry","Initiator","Durable"]},
+  {id:19,n:"tiny",f:"Tiny",r:["Carry","Nuker","Initiator"]},
+  {id:20,n:"vengefulspirit",f:"Vengeful Spirit",r:["Support","Disabler"]},
+  {id:21,n:"windrunner",f:"Windranger",r:["Support","Carry","Escape"]},
+  {id:22,n:"zuus",f:"Zeus",r:["Nuker","Initiator"]},
+  {id:23,n:"kunkka",f:"Kunkka",r:["Carry","Support","Initiator"]},
+  {id:25,n:"lina",f:"Lina",r:["Support","Carry","Nuker"]},
+  {id:26,n:"lion",f:"Lion",r:["Support","Disabler","Nuker"]},
+  {id:27,n:"shadow_shaman",f:"Shadow Shaman",r:["Support","Disabler","Pusher"]},
+  {id:28,n:"slardar",f:"Slardar",r:["Carry","Initiator","Disabler"]},
+  {id:29,n:"tidehunter",f:"Tidehunter",r:["Initiator","Disabler","Durable"]},
+  {id:30,n:"witch_doctor",f:"Witch Doctor",r:["Support","Disabler","Nuker"]},
+  {id:31,n:"lich",f:"Lich",r:["Support","Nuker","Disabler"]},
+  {id:32,n:"riki",f:"Riki",r:["Carry","Escape","Disabler"]},
+  {id:33,n:"enigma",f:"Enigma",r:["Initiator","Disabler","Jungler"]},
+  {id:34,n:"tinker",f:"Tinker",r:["Nuker","Pusher"]},
+  {id:35,n:"sniper",f:"Sniper",r:["Carry","Nuker"]},
+  {id:36,n:"necrolyte",f:"Necrophos",r:["Carry","Support","Nuker"]},
+  {id:37,n:"warlock",f:"Warlock",r:["Support","Initiator","Nuker"]},
+  {id:38,n:"beastmaster",f:"Beastmaster",r:["Initiator","Jungler","Durable"]},
+  {id:39,n:"queenofpain",f:"Queen of Pain",r:["Carry","Escape","Nuker"]},
+  {id:40,n:"venomancer",f:"Venomancer",r:["Carry","Support","Nuker"]},
+  {id:41,n:"faceless_void",f:"Faceless Void",r:["Carry","Initiator","Disabler"]},
+  {id:42,n:"skeleton_king",f:"Wraith King",r:["Carry","Initiator","Durable"]},
+  {id:43,n:"death_prophet",f:"Death Prophet",r:["Carry","Pusher","Nuker"]},
+  {id:44,n:"phantom_assassin",f:"Phantom Assassin",r:["Carry","Escape"]},
+  {id:45,n:"pugna",f:"Pugna",r:["Support","Nuker","Pusher"]},
+  {id:46,n:"templar_assassin",f:"Templar Assassin",r:["Carry","Escape","Nuker"]},
+  {id:47,n:"viper",f:"Viper",r:["Carry","Nuker","Durable"]},
+  {id:48,n:"luna",f:"Luna",r:["Carry","Pusher"]},
+  {id:49,n:"dragon_knight",f:"Dragon Knight",r:["Carry","Durable","Pusher"]},
+  {id:50,n:"dazzle",f:"Dazzle",r:["Support","Nuker","Disabler"]},
+  {id:51,n:"rattletrap",f:"Clockwerk",r:["Initiator","Durable","Disabler"]},
+  {id:52,n:"leshrac",f:"Leshrac",r:["Carry","Support","Nuker"]},
+  {id:53,n:"furion",f:"Nature's Prophet",r:["Carry","Pusher","Jungler"]},
+  {id:54,n:"life_stealer",f:"Lifestealer",r:["Carry","Durable","Jungler"]},
+  {id:55,n:"dark_seer",f:"Dark Seer",r:["Initiator","Disabler","Support"]},
+  {id:56,n:"clinkz",f:"Clinkz",r:["Carry","Escape","Nuker"]},
+  {id:57,n:"omniknight",f:"Omniknight",r:["Support","Durable"]},
+  {id:58,n:"enchantress",f:"Enchantress",r:["Support","Carry","Jungler"]},
+  {id:59,n:"huskar",f:"Huskar",r:["Carry","Durable","Initiator"]},
+  {id:60,n:"night_stalker",f:"Night Stalker",r:["Carry","Initiator","Durable"]},
+  {id:61,n:"broodmother",f:"Broodmother",r:["Carry","Pusher","Escape"]},
+  {id:62,n:"bounty_hunter",f:"Bounty Hunter",r:["Carry","Support","Escape"]},
+  {id:63,n:"weaver",f:"Weaver",r:["Carry","Escape","Nuker"]},
+  {id:64,n:"jakiro",f:"Jakiro",r:["Support","Nuker","Disabler"]},
+  {id:65,n:"batrider",f:"Batrider",r:["Initiator","Disabler","Nuker"]},
+  {id:66,n:"chen",f:"Chen",r:["Support","Jungler","Pusher"]},
+  {id:67,n:"spectre",f:"Spectre",r:["Carry","Durable"]},
+  {id:68,n:"ancient_apparition",f:"Ancient Apparition",r:["Support","Nuker","Disabler"]},
+  {id:69,n:"doom_bringer",f:"Doom",r:["Carry","Jungler","Disabler"]},
+  {id:70,n:"ursa",f:"Ursa",r:["Carry","Jungler","Initiator"]},
+  {id:71,n:"spirit_breaker",f:"Spirit Breaker",r:["Initiator","Carry","Durable"]},
+  {id:72,n:"gyrocopter",f:"Gyrocopter",r:["Carry","Nuker","Initiator"]},
+  {id:73,n:"alchemist",f:"Alchemist",r:["Carry","Durable","Jungler"]},
+  {id:74,n:"invoker",f:"Invoker",r:["Carry","Nuker","Disabler"]},
+  {id:75,n:"silencer",f:"Silencer",r:["Carry","Support","Disabler"]},
+  {id:76,n:"obsidian_destroyer",f:"Outworld Destroyer",r:["Carry","Nuker","Disabler"]},
+  {id:77,n:"lycan",f:"Lycan",r:["Carry","Pusher","Jungler"]},
+  {id:78,n:"brewmaster",f:"Brewmaster",r:["Initiator","Nuker","Durable"]},
+  {id:79,n:"shadow_demon",f:"Shadow Demon",r:["Support","Disabler","Nuker"]},
+  {id:80,n:"lone_druid",f:"Lone Druid",r:["Carry","Pusher","Jungler"]},
+  {id:81,n:"chaos_knight",f:"Chaos Knight",r:["Carry","Initiator","Durable"]},
+  {id:82,n:"meepo",f:"Meepo",r:["Carry","Jungler","Escape"]},
+  {id:83,n:"treant",f:"Treant Protector",r:["Support","Initiator","Durable"]},
+  {id:84,n:"ogre_magi",f:"Ogre Magi",r:["Support","Durable","Nuker"]},
+  {id:85,n:"undying",f:"Undying",r:["Support","Initiator","Durable"]},
+  {id:86,n:"rubick",f:"Rubick",r:["Support","Nuker","Disabler"]},
+  {id:87,n:"disruptor",f:"Disruptor",r:["Support","Nuker","Disabler"]},
+  {id:88,n:"nyx_assassin",f:"Nyx Assassin",r:["Support","Nuker","Disabler"]},
+  {id:89,n:"naga_siren",f:"Naga Siren",r:["Carry","Disabler","Pusher"]},
+  {id:90,n:"keeper_of_the_light",f:"Keeper of the Light",r:["Support","Nuker","Pusher"]},
+  {id:91,n:"wisp",f:"Io",r:["Support","Escape"]},
+  {id:92,n:"visage",f:"Visage",r:["Support","Carry","Nuker"]},
+  {id:93,n:"slark",f:"Slark",r:["Carry","Escape","Disabler"]},
+  {id:94,n:"medusa",f:"Medusa",r:["Carry","Durable"]},
+  {id:95,n:"troll_warlord",f:"Troll Warlord",r:["Carry","Disabler"]},
+  {id:96,n:"centaur",f:"Centaur Warrunner",r:["Initiator","Durable","Disabler"]},
+  {id:97,n:"magnataur",f:"Magnus",r:["Initiator","Disabler","Carry"]},
+  {id:98,n:"shredder",f:"Timbersaw",r:["Carry","Escape","Nuker"]},
+  {id:99,n:"bristleback",f:"Bristleback",r:["Carry","Durable","Nuker"]},
+  {id:100,n:"tusk",f:"Tusk",r:["Support","Initiator","Disabler"]},
+  {id:101,n:"skywrath_mage",f:"Skywrath Mage",r:["Support","Nuker","Disabler"]},
+  {id:102,n:"abaddon",f:"Abaddon",r:["Support","Carry","Durable"]},
+  {id:103,n:"elder_titan",f:"Elder Titan",r:["Support","Initiator","Disabler"]},
+  {id:104,n:"legion_commander",f:"Legion Commander",r:["Carry","Initiator","Durable"]},
+  {id:105,n:"techies",f:"Techies",r:["Support","Nuker","Disabler"]},
+  {id:106,n:"ember_spirit",f:"Ember Spirit",r:["Carry","Escape","Nuker"]},
+  {id:107,n:"earth_spirit",f:"Earth Spirit",r:["Initiator","Disabler","Nuker"]},
+  {id:108,n:"abyssal_underlord",f:"Underlord",r:["Initiator","Durable","Pusher"]},
+  {id:109,n:"terrorblade",f:"Terrorblade",r:["Carry","Pusher","Escape"]},
+  {id:110,n:"phoenix",f:"Phoenix",r:["Support","Initiator","Nuker"]},
+  {id:111,n:"oracle",f:"Oracle",r:["Support","Nuker","Disabler"]},
+  {id:112,n:"over_mind",f:"Winter Wyvern",r:["Support","Nuker","Disabler"]},
+  {id:113,n:"arc_warden",f:"Arc Warden",r:["Carry","Escape","Nuker"]},
+  {id:114,n:"monkey_king",f:"Monkey King",r:["Carry","Escape","Initiator"]},
+  {id:119,n:"dark_willow",f:"Dark Willow",r:["Support","Escape","Nuker"]},
+  {id:120,n:"pangolier",f:"Pangolier",r:["Initiator","Disabler","Escape"]},
+  {id:121,n:"grimstroke",f:"Grimstroke",r:["Support","Nuker","Disabler"]},
+  {id:123,n:"hoodwink",f:"Hoodwink",r:["Support","Carry","Escape"]},
+  {id:126,n:"void_spirit",f:"Void Spirit",r:["Carry","Escape","Nuker"]},
+  {id:128,n:"snapfire",f:"Snapfire",r:["Support","Disabler","Nuker"]},
+  {id:129,n:"mars",f:"Mars",r:["Carry","Initiator","Durable"]},
+  {id:131,n:"ringmaster",f:"Ringmaster",r:["Support","Disabler"]},
+  {id:135,n:"dawnbreaker",f:"Dawnbreaker",r:["Carry","Support","Initiator"]},
+  {id:136,n:"marci",f:"Marci",r:["Support","Carry","Initiator"]},
+  {id:137,n:"primal_beast",f:"Primal Beast",r:["Initiator","Durable","Nuker"]},
+  {id:138,n:"muerta",f:"Muerta",r:["Carry","Support","Disabler"]},
+  {id:145,n:"kez",f:"Kez",r:["Carry","Escape","Nuker"]},
+].sort((a,b)=>a.f.localeCompare(b.f));
 
-const ROLES_COLOR = {Carry:"#f59e0b",Support:"#60a5fa",Nuker:"#f87171",Disabler:"#a78bfa",Jungler:"#34d399",Durable:"#fb923c",Escape:"#e879f9",Pusher:"#4ade80",Initiator:"#fbbf24"};
-const HERO_IMG = n => `https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/${n}.png`;
-const ITEM_IMG = n => `https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/items/${n.replace('item_','')}.png`;
+const HIMG = n=>`https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/${n}.png`;
+const IIMG = n=>`https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/items/${n.replace('item_','')}.png`;
 
-// ---- STATE ----
-let state = {
-  search: '',
-  selected: null,
-  loading: false,
-  error: null,
-  items: null,   // raw API response
-  abilities: null,
-  tab: 'items',
-  apiDebug: null
-};
+// ─── STATE ───────────────────────────────────────────────────────────────
+let S={search:'',hero:null,loading:false,error:null,timings:null,tab:'items'};
+const set=p=>{Object.assign(S,p);draw()};
 
-function setState(patch) {
-  Object.assign(state, patch);
-  render();
-}
-
-// ---- API ----
-async function loadHero(hero) {
-  setState({selected: hero, loading: true, error: null, items: null, abilities: null, search: '', apiDebug: null});
-  try {
-    // Use OpenDota public API
-    const [itemsRes, abilitiesRes] = await Promise.all([
-      fetch(`https://api.opendota.com/api/heroes/${hero.id}/itemPopularity`),
-      fetch(`https://api.opendota.com/api/heroes/${hero.id}/abilities`)
-    ]);
-    const items = await itemsRes.json();
-    const abilities = await abilitiesRes.json();
-
-    // Store raw for debug
-    setState({
-      loading: false,
-      items,
-      abilities,
-      apiDebug: JSON.stringify(items).slice(0, 300)
-    });
-  } catch(e) {
-    setState({loading: false, error: 'Error de conexión: ' + e.message});
+// ─── API ─────────────────────────────────────────────────────────────────
+// Using /scenarios/itemTimings?hero_id=X — the real endpoint with actual data
+async function loadHero(hero){
+  set({hero,loading:true,error:null,timings:null,search:'',tab:'items'});
+  try{
+    // Fetch item timings for this hero — returns array of {hero_id, item, time, games, wins}
+    const url=`https://api.opendota.com/api/scenarios/itemTimings?hero_id=${hero.id}`;
+    const res=await fetch(url);
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data=await res.json();
+    if(!Array.isArray(data)) throw new Error('Respuesta inesperada de la API');
+    set({loading:false,timings:data});
+  }catch(e){
+    set({loading:false,error:e.message});
   }
 }
 
-// ---- PARSE DATA ----
-function getPhases(items) {
-  if (!items || typeof items !== 'object') return [];
-  const phases = [
-    {key: 'start_game_items', label: 'INICIO', icon: '🌅'},
-    {key: 'early_game_items', label: 'EARLY', icon: '⚡'},
-    {key: 'mid_game_items',   label: 'MID',   icon: '⚔️'},
-    {key: 'late_game_items',  label: 'LATE',  icon: '👑'},
+// ─── PROCESS DATA ────────────────────────────────────────────────────────
+// timings: [{hero_id, item, time (seconds), games (string), wins (string)}]
+// Group by time buckets: 0-10min, 10-20min, 20-30min, 30+min
+function processTimings(timings){
+  const phases=[
+    {label:'Inicio',icon:'🌅',min:0,max:600},      // 0-10 min
+    {label:'Early',icon:'⚡',min:600,max:1200},    // 10-20 min
+    {label:'Mid',icon:'⚔️',min:1200,max:1800},     // 20-30 min
+    {label:'Late',icon:'👑',min:1800,max:99999},   // 30+ min
   ];
-  return phases.map(p => {
-    const raw = items[p.key];
-    if (!raw || typeof raw !== 'object') return {...p, list: []};
-    const list = Object.entries(raw)
-      .filter(([, v]) => v && typeof v === 'object' && v.games > 0)
-      .map(([name, v]) => ({name, wr: v.wins / v.games, games: v.games}))
-      .sort((a,b) => b.wr - a.wr)
-      .slice(0, 6);
-    return {...p, list};
+  return phases.map(p=>{
+    // Aggregate items in this time window
+    const agg={};
+    timings
+      .filter(t=>t.time>=p.min && t.time<p.max)
+      .forEach(t=>{
+        const g=parseInt(t.games)||0;
+        const w=parseInt(t.wins)||0;
+        if(!agg[t.item]) agg[t.item]={games:0,wins:0};
+        agg[t.item].games+=g;
+        agg[t.item].wins+=w;
+      });
+    const list=Object.entries(agg)
+      .filter(([,v])=>v.games>=100) // mínimo 100 partidas para ser confiable
+      .map(([item,v])=>({item,wr:v.wins/v.games,games:v.games}))
+      .sort((a,b)=>b.wr-a.wr)
+      .slice(0,6);
+    return {...p,list};
   });
 }
 
-function getAbilities(abilities) {
-  if (!abilities || typeof abilities !== 'object') return [];
-  return Object.entries(abilities)
-    .filter(([, v]) => v && v.games > 0)
-    .map(([name, v]) => ({name, wr: v.wins / v.games, games: v.games}))
-    .sort((a,b) => b.wr - a.wr)
-    .slice(0, 8);
-}
-
-// ---- RENDER ----
-function wr(val) {
-  const p = Math.round(val * 100);
-  const c = p >= 55 ? '#4ade80' : p >= 50 ? '#fbbf24' : '#f87171';
+// ─── HELPERS ─────────────────────────────────────────────────────────────
+function wrBadge(wr){
+  const p=Math.round(wr*100);
+  const c=p>=55?'#4ade80':p>=50?'#fbbf24':'#f87171';
   return `<span style="color:${c};font-weight:700;font-family:monospace;font-size:13px">${p}% WR</span>`;
 }
 
-function renderItemCard(item) {
-  const name = item.name.replace('item_','').replace(/_/g,' ');
-  const imgSrc = ITEM_IMG(item.name);
-  return `
-    <div style="flex:1 1 110px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;border-right:1px solid rgba(255,255,255,0.04);text-align:center">
-      <img src="${imgSrc}" style="width:72px;height:52px;object-fit:cover;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:#1a2030"
-           onerror="this.style.display='none'" />
-      <div style="font-size:11px;color:#9ca3af;text-transform:capitalize;max-width:100px;line-height:1.3">${name}</div>
-      ${wr(item.wr)}
-      <div style="font-size:10px;color:#374151;font-family:monospace">${item.games.toLocaleString()}p</div>
-    </div>`;
+function itemCard(entry,i){
+  const name=entry.item.replace('item_','').replace(/_/g,' ');
+  return`<div style="flex:1 1 110px;padding:14px 10px;display:flex;flex-direction:column;align-items:center;gap:6px;border-right:1px solid rgba(255,255,255,.04);text-align:center">
+    <span style="font-size:10px;color:${i===0?'#f59e0b':'#374151'};font-family:monospace;font-weight:700">#${i+1}</span>
+    <img src="${IIMG(entry.item)}" style="width:72px;height:52px;object-fit:cover;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:#1a2030" onerror="this.style.opacity='.3'"/>
+    <div style="font-size:11px;color:#9ca3af;text-transform:capitalize;max-width:100px;line-height:1.3">${name}</div>
+    ${wrBadge(entry.wr)}
+    <div style="font-size:10px;color:#374151;font-family:monospace">${entry.games.toLocaleString()} partidas</div>
+  </div>`;
 }
 
-function renderPhase(phase) {
-  const hasData = phase.list.length > 0;
-  return `
-    <div style="background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;margin-bottom:16px">
-      <div style="padding:11px 16px;background:rgba(255,255,255,0.02);border-bottom:1px solid rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:13px;font-weight:800;letter-spacing:1.5px;color:#f59e0b;text-transform:uppercase">${phase.icon} ${phase.label} GAME</span>
-        ${!hasData ? '<span style="font-size:11px;color:#374151;font-style:italic">Sin datos de la API</span>' : ''}
-      </div>
-      ${hasData ? `<div style="display:flex;flex-wrap:wrap">${phase.list.map(renderItemCard).join('')}</div>` : ''}
-    </div>`;
+function phaseCard(phase){
+  return`<div style="background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);border-radius:12px;overflow:hidden;margin-bottom:16px">
+    <div style="padding:11px 16px;background:rgba(255,255,255,.02);border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:13px;font-weight:800;letter-spacing:1.5px;color:#f59e0b;text-transform:uppercase">${phase.icon} ${phase.label} game</span>
+      <span style="font-size:10px;color:#374151">${phase.label==='Inicio'?'0-10 min':phase.label==='Early'?'10-20 min':phase.label==='Mid'?'20-30 min':'30+ min'} · mín. 100 partidas</span>
+    </div>
+    ${phase.list.length===0
+      ?`<div style="padding:18px;color:#374151;font-size:12px;text-align:center;font-style:italic">Sin suficientes datos en esta fase</div>`
+      :`<div style="display:flex;flex-wrap:wrap">${phase.list.map((e,i)=>itemCard(e,i)).join('')}</div>`
+    }
+  </div>`;
 }
 
-function renderAbilityRow(ab, i) {
-  const p = Math.round(ab.wr * 100);
-  const bar = p >= 55 ? '#4ade80' : p >= 50 ? '#fbbf24' : '#f87171';
-  const name = ab.name.replace(/_/g,' ');
-  return `
-    <div style="background:rgba(255,255,255,0.025);border:1px solid rgba(255,255,255,0.07);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:14px;margin-bottom:10px">
-      <div style="font-size:12px;font-family:monospace;font-weight:800;min-width:26px;color:${i<3?'#f59e0b':'#374151'}">#${i+1}</div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600;color:#d1d5db;text-transform:capitalize;margin-bottom:7px">${name}</div>
-        <div style="height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden">
-          <div style="height:100%;width:${p}%;background:${bar};border-radius:3px"></div>
-        </div>
-      </div>
-      <div style="text-align:right;min-width:80px">
-        ${wr(ab.wr)}
-        <div style="font-size:10px;color:#374151;font-family:monospace;margin-top:3px">${ab.games.toLocaleString()}p</div>
-      </div>
-    </div>`;
-}
+// ─── RENDER ──────────────────────────────────────────────────────────────
+function draw(){
+  const{search,hero,loading,error,timings,tab}=S;
+  const list=(search?HEROES.filter(h=>h.f.toLowerCase().includes(search.toLowerCase())):HEROES);
 
-function render() {
-  const {search, selected, loading, error, items, abilities, tab, apiDebug} = state;
-  const filtered = HEROES.filter(h => h.full.toLowerCase().includes(search.toLowerCase()));
-  const list = search ? filtered : HEROES;
-
-  document.getElementById('app').innerHTML = `
+  document.getElementById('app').innerHTML=`
   <div style="display:flex;flex-direction:column;min-height:100vh">
 
     <!-- HEADER -->
-    <header style="display:flex;align-items:center;justify-content:space-between;padding:13px 24px;background:#0d1017;border-bottom:1px solid rgba(245,158,11,0.2);flex-shrink:0;position:sticky;top:0;z-index:100">
+    <header style="display:flex;align-items:center;justify-content:space-between;padding:13px 24px;background:#0d1017;border-bottom:1px solid rgba(245,158,11,.2);flex-shrink:0;position:sticky;top:0;z-index:100">
       <div style="display:flex;align-items:center;gap:10px">
         <span style="color:#f59e0b;font-size:18px">◆</span>
         <span style="font-size:16px;font-weight:900;letter-spacing:3px;color:#fff">DOTA BUILD INTEL</span>
@@ -298,117 +260,94 @@ function render() {
     <div style="display:flex;flex:1;height:calc(100vh - 50px);overflow:hidden">
 
       <!-- SIDEBAR -->
-      <aside style="width:250px;background:#0d1017;border-right:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0">
-        <div style="padding:10px;border-bottom:1px solid rgba(255,255,255,0.06)">
+      <aside style="width:250px;background:#0d1017;border-right:1px solid rgba(255,255,255,.06);display:flex;flex-direction:column;overflow:hidden;flex-shrink:0">
+        <div style="padding:10px;border-bottom:1px solid rgba(255,255,255,.06)">
           <div style="position:relative">
-            <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none;font-size:13px">🔍</span>
-            <input id="search-input"
-              style="width:100%;background:rgba(255,255,255,0.06);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:8px 8px 8px 30px;color:#e2e8f0;font-size:13px;font-family:inherit"
-              placeholder="Buscar héroe..."
-              value="${search}"
-              autocomplete="off"
-            />
+            <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none">🔍</span>
+            <input id="si" style="width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(245,158,11,.25);border-radius:8px;padding:8px 8px 8px 30px;color:#e2e8f0;font-size:13px;font-family:inherit"
+              placeholder="Buscar héroe..." value="${search}" autocomplete="off"/>
           </div>
-          ${search ? `<div style="font-size:11px;color:#4b5563;margin-top:5px;padding-left:2px">${filtered.length} resultado${filtered.length!==1?'s':''}</div>` : ''}
+          ${search?`<div style="font-size:11px;color:#4b5563;margin-top:4px;padding-left:2px">${list.length} resultado${list.length!==1?'s':''}</div>`:''}
         </div>
         <div style="flex:1;overflow-y:auto">
-          ${list.map(h => `
-            <button class="hrow" onclick="selectHero(${h.id})"
-              style="padding:7px 10px;display:flex;align-items:center;gap:9px;border-left:3px solid ${selected?.id===h.id?'#f59e0b':'transparent'};background:${selected?.id===h.id?'rgba(245,158,11,0.12)':'transparent'}">
-              <img src="${HERO_IMG(h.name)}"
-                style="width:46px;height:26px;border-radius:4px;object-fit:cover;background:#1a2030;flex-shrink:0"
-                onerror="this.style.opacity='0.1'" />
+          ${list.map(h=>`
+            <button class="hrow${hero?.id===h.id?' active':''}" onclick="pick(${h.id})"
+              style="padding:7px 10px;display:flex;align-items:center;gap:9px">
+              <img src="${HIMG(h.n)}" style="width:46px;height:26px;border-radius:4px;object-fit:cover;background:#1a2030;flex-shrink:0" onerror="this.style.opacity='.15'"/>
               <div style="flex:1;min-width:0">
-                <div style="font-size:12px;color:${selected?.id===h.id?'#f59e0b':'#d1d5db'};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.full}</div>
+                <div style="font-size:12px;color:${hero?.id===h.id?'#f59e0b':'#d1d5db'};font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${h.f}</div>
                 <div style="display:flex;gap:4px;margin-top:2px">
-                  ${h.roles.slice(0,2).map(r=>`<span style="font-size:9px;color:${ROLES_COLOR[r]||'#555'};font-weight:700">${r}</span>`).join('')}
+                  ${h.r.slice(0,2).map(r=>`<span style="font-size:9px;color:${RC[r]||'#555'};font-weight:700">${r}</span>`).join('')}
                 </div>
               </div>
-            </button>
-          `).join('')}
+            </button>`).join('')}
         </div>
       </aside>
 
       <!-- MAIN -->
       <main style="flex:1;overflow-y:auto;min-width:0">
-        ${!selected ? `
+        ${!hero?`
           <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;padding:40px;text-align:center">
-            <div style="font-size:60px">⚔️</div>
+            <div style="font-size:64px">⚔️</div>
             <div style="font-size:24px;font-weight:900;letter-spacing:2px;color:#fff">Elige un héroe</div>
-            <div style="font-size:14px;color:#6b7280;max-width:300px;line-height:1.6">Haz clic en cualquier héroe de la lista para ver su build con mayor winrate</div>
+            <div style="font-size:14px;color:#6b7280;max-width:300px;line-height:1.6">Haz clic en cualquier héroe de la izquierda para ver su build con mayor winrate</div>
           </div>
-        ` : `
+        `:`
           <!-- BANNER -->
-          <div style="position:relative;height:160px;overflow:hidden">
-            <div style="position:absolute;inset:0;background-image:url(${HERO_IMG(selected.name)});background-size:cover;background-position:center 25%;filter:blur(4px) brightness(0.3);transform:scale(1.1)"></div>
-            <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.1),#0a0c10)"></div>
-            <div style="position:relative;z-index:1;padding:20px 28px;display:flex;align-items:flex-end;gap:20px;height:100%">
-              <img src="${HERO_IMG(selected.name)}" style="width:90px;height:52px;border-radius:6px;object-fit:cover;border:2px solid rgba(245,158,11,0.5)" onerror="this.style.display='none'" />
+          <div style="position:relative;height:155px;overflow:hidden">
+            <div style="position:absolute;inset:0;background-image:url(${HIMG(hero.n)});background-size:cover;background-position:center 25%;filter:blur(4px) brightness(.3);transform:scale(1.1)"></div>
+            <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.1),#0a0c10)"></div>
+            <div style="position:relative;z-index:1;padding:18px 28px;display:flex;align-items:flex-end;gap:18px;height:100%">
+              <img src="${HIMG(hero.n)}" style="width:88px;height:50px;border-radius:6px;object-fit:cover;border:2px solid rgba(245,158,11,.5)" onerror="this.style.display='none'"/>
               <div>
-                <h1 style="font-size:30px;font-weight:900;letter-spacing:2px;color:#fff;text-transform:uppercase;text-shadow:0 2px 12px rgba(0,0,0,0.9)">${selected.full}</h1>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
-                  ${selected.roles.map(r=>`<span style="font-size:10px;border:1px solid ${ROLES_COLOR[r]||'#555'};border-radius:100px;padding:2px 9px;font-weight:700;color:${ROLES_COLOR[r]||'#aaa'}">${r}</span>`).join('')}
+                <h1 style="font-size:28px;font-weight:900;letter-spacing:2px;color:#fff;text-transform:uppercase;text-shadow:0 2px 12px rgba(0,0,0,.9)">${hero.f}</h1>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px">
+                  ${hero.r.map(r=>`<span style="font-size:10px;border:1px solid ${RC[r]||'#555'};border-radius:100px;padding:2px 9px;font-weight:700;color:${RC[r]||'#aaa'}">${r}</span>`).join('')}
                 </div>
               </div>
             </div>
           </div>
 
           <!-- TABS -->
-          <div style="display:flex;padding:0 28px;border-bottom:1px solid rgba(255,255,255,0.07)">
-            <button class="tab-btn ${tab==='items'?'active':''}" onclick="setTab('items')">🗡️ Items por fase</button>
-            <button class="tab-btn ${tab==='abilities'?'active':''}" onclick="setTab('abilities')">✨ Habilidades</button>
+          <div style="display:flex;padding:0 28px;border-bottom:1px solid rgba(255,255,255,.07)">
+            <button class="tab${tab==='items'?' active':''}" onclick="setTab('items')">🗡️ Items por fase</button>
           </div>
 
-          <!-- CONTENT -->
-          <div style="padding:22px 28px 48px">
-            ${loading ? `
+          <!-- CONTENIDO -->
+          <div style="padding:20px 28px 48px">
+            ${loading?`
               <div style="display:flex;flex-direction:column;align-items:center;gap:14px;padding:60px;color:#6b7280;font-size:14px">
-                <div style="width:28px;height:28px;border:2px solid rgba(245,158,11,0.15);border-top:2px solid #f59e0b;border-radius:50%;animation:spin 0.8s linear infinite"></div>
-                Cargando builds de ${selected.full}...
+                <div style="width:28px;height:28px;border:2px solid rgba(245,158,11,.15);border-top:2px solid #f59e0b;border-radius:50%;animation:spin .8s linear infinite"></div>
+                Cargando builds de ${hero.f}...
               </div>
-            ` : error ? `
-              <div style="margin:4px 0 20px;padding:16px 20px;background:rgba(248,113,113,0.08);border:1px solid rgba(248,113,113,0.25);border-radius:10px;color:#f87171;font-size:13px">
-                ⚠️ ${error}
+            `:error?`
+              <div style="padding:18px 20px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);border-radius:10px;color:#f87171;font-size:13px;line-height:1.6">
+                ⚠️ Error al conectar con OpenDota: <strong>${error}</strong><br/>
+                <span style="font-size:11px;color:#9ca3af;margin-top:6px;display:block">Intenta de nuevo en unos segundos o recarga la página.</span>
               </div>
-            ` : items ? `
-
-              ${tab === 'items' ? `
-                <p style="font-size:13px;color:#4b5563;margin-bottom:16px">Top 6 ítems por <strong style="color:#f59e0b">winrate</strong> en cada fase del juego</p>
-                ${getPhases(items).map(renderPhase).join('')}
-              ` : `
-                <p style="font-size:13px;color:#4b5563;margin-bottom:16px">Habilidades con mayor <strong style="color:#f59e0b">winrate</strong></p>
-                ${getAbilities(abilities).length === 0
-                  ? '<div style="color:#4b5563;padding:20px;text-align:center">Sin datos de habilidades</div>'
-                  : getAbilities(abilities).map((ab,i) => renderAbilityRow(ab,i)).join('')
-                }
-              `}
-
-            ` : ''}
+            `:timings?`
+              <p style="font-size:13px;color:#4b5563;margin-bottom:18px">
+                Ítems con mayor <strong style="color:#f59e0b">winrate</strong> por fase del juego · basado en datos reales de OpenDota
+              </p>
+              ${processTimings(timings).map(phaseCard).join('')}
+              <div style="font-size:11px;color:#374151;margin-top:8px;text-align:right">
+                Datos de: <a href="https://www.opendota.com" target="_blank" style="color:#f59e0b;text-decoration:none">OpenDota</a>
+              </div>
+            `:''}
           </div>
         `}
       </main>
     </div>
   </div>`;
 
-  // Bind search
-  const inp = document.getElementById('search-input');
-  if (inp) {
-    inp.addEventListener('input', e => setState({search: e.target.value}));
-    inp.focus();
-  }
+  const si=document.getElementById('si');
+  if(si){si.addEventListener('input',e=>set({search:e.target.value}));si.focus();}
 }
 
-function selectHero(id) {
-  const hero = HEROES.find(h => h.id === id);
-  if (hero) loadHero(hero);
-}
+function pick(id){const h=HEROES.find(x=>x.id===id);if(h)loadHero(h);}
+function setTab(t){set({tab:t});}
 
-function setTab(tab) {
-  setState({tab});
-}
-
-// Initial render
-render();
+draw();
 </script>
 </body>
 </html>
