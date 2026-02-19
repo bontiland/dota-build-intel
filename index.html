@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dota Build Intel</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0a0c10; color: #e2e8f0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: rgba(245,158,11,0.35); border-radius: 2px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .hrow { transition: background 0.15s; cursor: pointer; }
+    .hrow:hover { background: rgba(245,158,11,0.1) !important; }
+    .hrow-active { background: rgba(245,158,11,0.15) !important; border-left-color: #f59e0b !important; }
+    input { outline: none; }
+    input:focus { border-color: rgba(245,158,11,0.7) !important; box-shadow: 0 0 0 2px rgba(245,158,11,0.12) !important; }
+    button { font-family: inherit; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useCallback } = React;
+
+const API = "https://api.opendota.com/api";
+const ITEM_IMG = (name) => `https://cdn.dota2.com/apps/dota2/images/items/${name.replace("item_", "")}_lg.png`;
+const HERO_IMG = (name) => `https://cdn.dota2.com/apps/dota2/images/heroes/${name.replace("npc_dota_hero_", "")}_full.png`;
+
+const ROLES_COLOR = {
+  Carry: "#f59e0b", Support: "#60a5fa", Nuker: "#f87171",
+  Disabler: "#a78bfa", Jungler: "#34d399", Durable: "#fb923c",
+  Escape: "#e879f9", Pusher: "#4ade80", Initiator: "#fbbf24",
+};
+
+const ALL_HEROES = [
+  { id: 1, name: "npc_dota_hero_antimage", localized_name: "Anti-Mage", roles: ["Carry", "Escape"] },
+  { id: 2, name: "npc_dota_hero_axe", localized_name: "Axe", roles: ["Initiator", "Durable", "Disabler"] },
+  { id: 3, name: "npc_dota_hero_bane", localized_name: "Bane", roles: ["Support", "Disabler", "Nuker"] },
+  { id: 4, name: "npc_dota_hero_bloodseeker", localized_name: "Bloodseeker", roles: ["Carry", "Nuker", "Disabler"] },
+  { id: 5, name: "npc_dota_hero_crystal_maiden", localized_name: "Crystal Maiden", roles: ["Support", "Disabler", "Nuker"] },
+  { id: 6, name: "npc_dota_hero_drow_ranger", localized_name: "Drow Ranger", roles: ["Carry", "Disabler"] },
+  { id: 7, name: "npc_dota_hero_earthshaker", localized_name: "Earthshaker", roles: ["Initiator", "Disabler", "Nuker", "Support"] },
+  { id: 8, name: "npc_dota_hero_juggernaut", localized_name: "Juggernaut", roles: ["Carry", "Pusher"] },
+  { id: 9, name: "npc_dota_hero_mirana", localized_name: "Mirana", roles: ["Carry", "Support", "Escape"] },
+  { id: 10, name: "npc_dota_hero_morphling", localized_name: "Morphling", roles: ["Carry", "Escape", "Nuker"] },
+  { id: 11, name: "npc_dota_hero_nevermore", localized_name: "Shadow Fiend", roles: ["Carry", "Nuker"] },
+  { id: 12, name: "npc_dota_hero_phantom_lancer", localized_name: "Phantom Lancer", roles: ["Carry", "Escape", "Pusher"] },
+  { id: 13, name: "npc_dota_hero_puck", localized_name: "Puck", roles: ["Escape", "Nuker", "Disabler"] },
+  { id: 14, name: "npc_dota_hero_pudge", localized_name: "Pudge", roles: ["Disabler", "Initiator", "Durable"] },
+  { id: 15, name: "npc_dota_hero_razor", localized_name: "Razor", roles: ["Carry", "Durable", "Nuker"] },
+  { id: 16, name: "npc_dota_hero_sand_king", localized_name: "Sand King", roles: ["Initiator", "Disabler", "Nuker"] },
+  { id: 17, name: "npc_dota_hero_storm_spirit", localized_name: "Storm Spirit", roles: ["Carry", "Escape", "Nuker"] },
+  { id: 18, name: "npc_dota_hero_sven", localized_name: "Sven", roles: ["Carry", "Initiator", "Durable"] },
+  { id: 19, name: "npc_dota_hero_tiny", localized_name: "Tiny", roles: ["Carry", "Nuker", "Initiator"] },
+  { id: 20, name: "npc_dota_hero_vengefulspirit", localized_name: "Vengeful Spirit", roles: ["Support", "Disabler"] },
+  { id: 21, name: "npc_dota_hero_windrunner", localized_name: "Windranger", roles: ["Support", "Carry", "Escape"] },
+  { id: 22, name: "npc_dota_hero_zuus", localized_name: "Zeus", roles: ["Nuker", "Initiator"] },
+  { id: 23, name: "npc_dota_hero_kunkka", localized_name: "Kunkka", roles: ["Carry", "Support", "Initiator"] },
+  { id: 25, name: "npc_dota_hero_lina", localized_name: "Lina", roles: ["Support", "Carry", "Nuker"] },
+  { id: 26, name: "npc_dota_hero_lion", localized_name: "Lion", roles: ["Support", "Disabler", "Nuker"] },
+  { id: 27, name: "npc_dota_hero_shadow_shaman", localized_name: "Shadow Shaman", roles: ["Support", "Disabler", "Pusher"] },
+  { id: 28, name: "npc_dota_hero_slardar", localized_name: "Slardar", roles: ["Carry", "Initiator", "Disabler"] },
+  { id: 29, name: "npc_dota_hero_tidehunter", localized_name: "Tidehunter", roles: ["Initiator", "Disabler", "Durable"] },
+  { id: 30, name: "npc_dota_hero_witch_doctor", localized_name: "Witch Doctor", roles: ["Support", "Disabler", "Nuker"] },
+  { id: 31, name: "npc_dota_hero_lich", localized_name: "Lich", roles: ["Support", "Nuker", "Disabler"] },
+  { id: 32, name: "npc_dota_hero_riki", localized_name: "Riki", roles: ["Carry", "Escape", "Disabler"] },
+  { id: 33, name: "npc_dota_hero_enigma", localized_name: "Enigma", roles: ["Initiator", "Disabler", "Jungler"] },
+  { id: 34, name: "npc_dota_hero_tinker", localized_name: "Tinker", roles: ["Nuker", "Pusher"] },
+  { id: 35, name: "npc_dota_hero_sniper", localized_name: "Sniper", roles: ["Carry", "Nuker"] },
+  { id: 36, name: "npc_dota_hero_necrolyte", localized_name: "Necrophos", roles: ["Carry", "Support", "Nuker"] },
+  { id: 37, name: "npc_dota_hero_warlock", localized_name: "Warlock", roles: ["Support", "Initiator", "Nuker"] },
+  { id: 38, name: "npc_dota_hero_beastmaster", localized_name: "Beastmaster", roles: ["Initiator", "Jungler", "Durable"] },
+  { id: 39, name: "npc_dota_hero_queenofpain", localized_name: "Queen of Pain", roles: ["Carry", "Escape", "Nuker"] },
+  { id: 40, name: "npc_dota_hero_venomancer", localized_name: "Venomancer", roles: ["Carry", "Support", "Nuker"] },
+  { id: 41, name: "npc_dota_hero_faceless_void", localized_name: "Faceless Void", roles: ["Carry", "Initiator", "Disabler"] },
+  { id: 42, name: "npc_dota_hero_skeleton_king", localized_name: "Wraith King", roles: ["Carry", "Initiator", "Durable"] },
+  { id: 43, name: "npc_dota_hero_death_prophet", localized_name: "Death Prophet", roles: ["Carry", "Pusher", "Nuker"] },
+  { id: 44, name: "npc_dota_hero_phantom_assassin", localized_name: "Phantom Assassin", roles: ["Carry", "Escape"] },
+  { id: 45, name: "npc_dota_hero_pugna", localized_name: "Pugna", roles: ["Support", "Nuker", "Pusher"] },
+  { id: 46, name: "npc_dota_hero_templar_assassin", localized_name: "Templar Assassin", roles: ["Carry", "Escape", "Nuker"] },
+  { id: 47, name: "npc_dota_hero_viper", localized_name: "Viper", roles: ["Carry", "Nuker", "Durable"] },
+  { id: 48, name: "npc_dota_hero_luna", localized_name: "Luna", roles: ["Carry", "Pusher"] },
+  { id: 49, name: "npc_dota_hero_dragon_knight", localized_name: "Dragon Knight", roles: ["Carry", "Durable", "Pusher"] },
+  { id: 50, name: "npc_dota_hero_dazzle", localized_name: "Dazzle", roles: ["Support", "Nuker", "Disabler"] },
+  { id: 51, name: "npc_dota_hero_rattletrap", localized_name: "Clockwerk", roles: ["Initiator", "Durable", "Disabler"] },
+  { id: 52, name: "npc_dota_hero_leshrac", localized_name: "Leshrac", roles: ["Carry", "Support", "Nuker"] },
+  { id: 53, name: "npc_dota_hero_furion", localized_name: "Nature's Prophet", roles: ["Carry", "Pusher", "Jungler"] },
+  { id: 54, name: "npc_dota_hero_life_stealer", localized_name: "Lifestealer", roles: ["Carry", "Durable", "Jungler"] },
+  { id: 55, name: "npc_dota_hero_dark_seer", localized_name: "Dark Seer", roles: ["Initiator", "Disabler", "Support"] },
+  { id: 56, name: "npc_dota_hero_clinkz", localized_name: "Clinkz", roles: ["Carry", "Escape", "Nuker"] },
+  { id: 57, name: "npc_dota_hero_omniknight", localized_name: "Omniknight", roles: ["Support", "Durable"] },
+  { id: 58, name: "npc_dota_hero_enchantress", localized_name: "Enchantress", roles: ["Support", "Carry", "Jungler"] },
+  { id: 59, name: "npc_dota_hero_huskar", localized_name: "Huskar", roles: ["Carry", "Durable", "Initiator"] },
+  { id: 60, name: "npc_dota_hero_night_stalker", localized_name: "Night Stalker", roles: ["Carry", "Initiator", "Durable"] },
+  { id: 61, name: "npc_dota_hero_broodmother", localized_name: "Broodmother", roles: ["Carry", "Pusher", "Escape"] },
+  { id: 62, name: "npc_dota_hero_bounty_hunter", localized_name: "Bounty Hunter", roles: ["Carry", "Support", "Escape"] },
+  { id: 63, name: "npc_dota_hero_weaver", localized_name: "Weaver", roles: ["Carry", "Escape", "Nuker"] },
+  { id: 64, name: "npc_dota_hero_jakiro", localized_name: "Jakiro", roles: ["Support", "Nuker", "Disabler"] },
+  { id: 65, name: "npc_dota_hero_batrider", localized_name: "Batrider", roles: ["Initiator", "Disabler", "Nuker"] },
+  { id: 66, name: "npc_dota_hero_chen", localized_name: "Chen", roles: ["Support", "Jungler", "Pusher"] },
+  { id: 67, name: "npc_dota_hero_spectre", localized_name: "Spectre", roles: ["Carry", "Durable"] },
+  { id: 68, name: "npc_dota_hero_ancient_apparition", localized_name: "Ancient Apparition", roles: ["Support", "Nuker", "Disabler"] },
+  { id: 69, name: "npc_dota_hero_doom_bringer", localized_name: "Doom", roles: ["Carry", "Jungler", "Disabler"] },
+  { id: 70, name: "npc_dota_hero_ursa", localized_name: "Ursa", roles: ["Carry", "Jungler", "Initiator"] },
+  { id: 71, name: "npc_dota_hero_spirit_breaker", localized_name: "Spirit Breaker", roles: ["Initiator", "Carry", "Durable"] },
+  { id: 72, name: "npc_dota_hero_gyrocopter", localized_name: "Gyrocopter", roles: ["Carry", "Nuker", "Initiator"] },
+  { id: 73, name: "npc_dota_hero_alchemist", localized_name: "Alchemist", roles: ["Carry", "Durable", "Jungler"] },
+  { id: 74, name: "npc_dota_hero_invoker", localized_name: "Invoker", roles: ["Carry", "Nuker", "Disabler"] },
+  { id: 75, name: "npc_dota_hero_silencer", localized_name: "Silencer", roles: ["Carry", "Support", "Disabler"] },
+  { id: 76, name: "npc_dota_hero_obsidian_destroyer", localized_name: "Outworld Destroyer", roles: ["Carry", "Nuker", "Disabler"] },
+  { id: 77, name: "npc_dota_hero_lycan", localized_name: "Lycan", roles: ["Carry", "Pusher", "Jungler"] },
+  { id: 78, name: "npc_dota_hero_brewmaster", localized_name: "Brewmaster", roles: ["Initiator", "Nuker", "Durable"] },
+  { id: 79, name: "npc_dota_hero_shadow_demon", localized_name: "Shadow Demon", roles: ["Support", "Disabler", "Nuker"] },
+  { id: 80, name: "npc_dota_hero_lone_druid", localized_name: "Lone Druid", roles: ["Carry", "Pusher", "Jungler"] },
+  { id: 81, name: "npc_dota_hero_chaos_knight", localized_name: "Chaos Knight", roles: ["Carry", "Initiator", "Durable"] },
+  { id: 82, name: "npc_dota_hero_meepo", localized_name: "Meepo", roles: ["Carry", "Jungler", "Escape"] },
+  { id: 83, name: "npc_dota_hero_treant", localized_name: "Treant Protector", roles: ["Support", "Initiator", "Durable"] },
+  { id: 84, name: "npc_dota_hero_ogre_magi", localized_name: "Ogre Magi", roles: ["Support", "Durable", "Nuker"] },
+  { id: 85, name: "npc_dota_hero_undying", localized_name: "Undying", roles: ["Support", "Initiator", "Durable"] },
+  { id: 86, name: "npc_dota_hero_rubick", localized_name: "Rubick", roles: ["Support", "Nuker", "Disabler"] },
+  { id: 87, name: "npc_dota_hero_disruptor", localized_name: "Disruptor", roles: ["Support", "Nuker", "Disabler"] },
+  { id: 88, name: "npc_dota_hero_nyx_assassin", localized_name: "Nyx Assassin", roles: ["Support", "Nuker", "Disabler"] },
+  { id: 89, name: "npc_dota_hero_naga_siren", localized_name: "Naga Siren", roles: ["Carry", "Disabler", "Pusher"] },
+  { id: 90, name: "npc_dota_hero_keeper_of_the_light", localized_name: "Keeper of the Light", roles: ["Support", "Nuker", "Pusher"] },
+  { id: 91, name: "npc_dota_hero_wisp", localized_name: "Io", roles: ["Support", "Escape"] },
+  { id: 92, name: "npc_dota_hero_visage", localized_name: "Visage", roles: ["Support", "Carry", "Nuker"] },
+  { id: 93, name: "npc_dota_hero_slark", localized_name: "Slark", roles: ["Carry", "Escape", "Disabler"] },
+  { id: 94, name: "npc_dota_hero_medusa", localized_name: "Medusa", roles: ["Carry", "Durable"] },
+  { id: 95, name: "npc_dota_hero_troll_warlord", localized_name: "Troll Warlord", roles: ["Carry", "Disabler"] },
+  { id: 96, name: "npc_dota_hero_centaur", localized_name: "Centaur Warrunner", roles: ["Initiator", "Durable", "Disabler"] },
+  { id: 97, name: "npc_dota_hero_magnataur", localized_name: "Magnus", roles: ["Initiator", "Disabler", "Carry"] },
+  { id: 98, name: "npc_dota_hero_shredder", localized_name: "Timbersaw", roles: ["Carry", "Escape", "Nuker"] },
+  { id: 99, name: "npc_dota_hero_bristleback", localized_name: "Bristleback", roles: ["Carry", "Durable", "Nuker"] },
+  { id: 100, name: "npc_dota_hero_tusk", localized_name: "Tusk", roles: ["Support", "Initiator", "Disabler"] },
+  { id: 101, name: "npc_dota_hero_skywrath_mage", localized_name: "Skywrath Mage", roles: ["Support", "Nuker", "Disabler"] },
+  { id: 102, name: "npc_dota_hero_abaddon", localized_name: "Abaddon", roles: ["Support", "Carry", "Durable"] },
+  { id: 103, name: "npc_dota_hero_elder_titan", localized_name: "Elder Titan", roles: ["Support", "Initiator", "Disabler"] },
+  { id: 104, name: "npc_dota_hero_legion_commander", localized_name: "Legion Commander", roles: ["Carry", "Initiator", "Durable"] },
+  { id: 105, name: "npc_dota_hero_techies", localized_name: "Techies", roles: ["Support", "Nuker", "Disabler"] },
+  { id: 106, name: "npc_dota_hero_ember_spirit", localized_name: "Ember Spirit", roles: ["Carry", "Escape", "Nuker"] },
+  { id: 107, name: "npc_dota_hero_earth_spirit", localized_name: "Earth Spirit", roles: ["Initiator", "Disabler", "Nuker"] },
+  { id: 108, name: "npc_dota_hero_abyssal_underlord", localized_name: "Underlord", roles: ["Initiator", "Durable", "Pusher"] },
+  { id: 109, name: "npc_dota_hero_terrorblade", localized_name: "Terrorblade", roles: ["Carry", "Pusher", "Escape"] },
+  { id: 110, name: "npc_dota_hero_phoenix", localized_name: "Phoenix", roles: ["Support", "Initiator", "Nuker"] },
+  { id: 111, name: "npc_dota_hero_oracle", localized_name: "Oracle", roles: ["Support", "Nuker", "Disabler"] },
+  { id: 112, name: "npc_dota_hero_over_mind", localized_name: "Winter Wyvern", roles: ["Support", "Nuker", "Disabler"] },
+  { id: 113, name: "npc_dota_hero_arc_warden", localized_name: "Arc Warden", roles: ["Carry", "Escape", "Nuker"] },
+  { id: 114, name: "npc_dota_hero_monkey_king", localized_name: "Monkey King", roles: ["Carry", "Escape", "Initiator"] },
+  { id: 119, name: "npc_dota_hero_dark_willow", localized_name: "Dark Willow", roles: ["Support", "Escape", "Nuker"] },
+  { id: 120, name: "npc_dota_hero_pangolier", localized_name: "Pangolier", roles: ["Initiator", "Disabler", "Escape"] },
+  { id: 121, name: "npc_dota_hero_grimstroke", localized_name: "Grimstroke", roles: ["Support", "Nuker", "Disabler"] },
+  { id: 123, name: "npc_dota_hero_hoodwink", localized_name: "Hoodwink", roles: ["Support", "Carry", "Escape"] },
+  { id: 126, name: "npc_dota_hero_void_spirit", localized_name: "Void Spirit", roles: ["Carry", "Escape", "Nuker"] },
+  { id: 128, name: "npc_dota_hero_snapfire", localized_name: "Snapfire", roles: ["Support", "Disabler", "Nuker"] },
+  { id: 129, name: "npc_dota_hero_mars", localized_name: "Mars", roles: ["Carry", "Initiator", "Durable"] },
+  { id: 131, name: "npc_dota_hero_ringmaster", localized_name: "Ringmaster", roles: ["Support", "Disabler"] },
+  { id: 135, name: "npc_dota_hero_dawnbreaker", localized_name: "Dawnbreaker", roles: ["Carry", "Support", "Initiator"] },
+  { id: 136, name: "npc_dota_hero_marci", localized_name: "Marci", roles: ["Support", "Carry", "Initiator"] },
+  { id: 137, name: "npc_dota_hero_primal_beast", localized_name: "Primal Beast", roles: ["Initiator", "Durable", "Nuker"] },
+  { id: 138, name: "npc_dota_hero_muerta", localized_name: "Muerta", roles: ["Carry", "Support", "Disabler"] },
+  { id: 145, name: "npc_dota_hero_kez", localized_name: "Kez", roles: ["Carry", "Escape", "Nuker"] },
+].sort((a, b) => a.localized_name.localeCompare(b.localized_name));
+
+function WinrateBadge({ wr }) {
+  const pct = Math.round(wr * 100);
+  const color = pct >= 55 ? "#4ade80" : pct >= 50 ? "#fbbf24" : "#f87171";
+  return React.createElement("span", { style: { color, fontWeight: 700, fontSize: 13, fontFamily: "monospace" } }, `${pct}% WR`);
+}
+
+function ItemCard({ name }) {
+  const [err, setErr] = useState(false);
+  if (!name) return null;
+  const displayName = name.replace("item_", "").replace(/_/g, " ");
+  const slotStyle = { width: 70, height: 50, borderRadius: 6, overflow: "hidden", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center" };
+  return React.createElement("div", { title: displayName, style: slotStyle },
+    !err
+      ? React.createElement("img", { src: ITEM_IMG(name), onError: () => setErr(true), style: { width: "100%", height: "100%", objectFit: "cover" }, alt: name })
+      : React.createElement("div", { style: { fontSize: 9, color: "#6b7280", textAlign: "center", padding: 4, textTransform: "capitalize" } }, displayName.slice(0, 10))
+  );
+}
+
+function App() {
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState(null);
+  const [buildData, setBuildData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState("items");
+
+  const filtered = ALL_HEROES.filter(h => h.localized_name.toLowerCase().includes(search.toLowerCase()));
+
+  const loadBuild = useCallback(async (hero) => {
+    setSelected(hero);
+    setSearch("");
+    setLoading(true);
+    setError(null);
+    setBuildData(null);
+    setActiveTab("items");
+    try {
+      const [items, abilities] = await Promise.all([
+        fetch(`${API}/heroes/${hero.id}/itemPopularity`).then(r => r.json()),
+        fetch(`${API}/heroes/${hero.id}/abilities`).then(r => r.json()),
+      ]);
+      setBuildData({ items, abilities });
+    } catch {
+      setError("No se pudo conectar con OpenDota. Verifica tu internet.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const getTopItems = (data) => {
+    if (!data) return [];
+    return [
+      { key: "start_game_items", label: "Inicio", icon: "🌅" },
+      { key: "early_game_items", label: "Early", icon: "⚡" },
+      { key: "mid_game_items", label: "Mid", icon: "⚔️" },
+      { key: "late_game_items", label: "Late", icon: "👑" },
+    ].map(({ key, label, icon }) => ({
+      label, icon,
+      items: Object.entries(data[key] || {})
+        .filter(([, s]) => s.games > 50)
+        .sort(([, a], [, b]) => (b.wins / b.games) - (a.wins / a.games))
+        .slice(0, 5)
+        .map(([name, s]) => ({ name, wr: s.wins / s.games, games: s.games })),
+    }));
+  };
+
+  const getTopAbilities = (abilities) => {
+    if (!abilities) return [];
+    return Object.entries(abilities)
+      .map(([name, s]) => ({ name, wr: s.wins / s.games, games: s.games }))
+      .filter(a => a.games > 100)
+      .sort((a, b) => b.wr - a.wr)
+      .slice(0, 8);
+  };
+
+  const e = React.createElement;
+  const displayHeroes = search ? filtered : ALL_HEROES;
+
+  return e("div", { style: { minHeight: "100vh", background: "#0a0c10", color: "#e2e8f0", display: "flex", flexDirection: "column" } },
+
+    // HEADER
+    e("header", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "13px 24px", background: "#0d1017", borderBottom: "1px solid rgba(245,158,11,0.2)", flexShrink: 0 } },
+      e("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
+        e("span", { style: { color: "#f59e0b", fontSize: 18 } }, "◆"),
+        e("span", { style: { fontSize: 16, fontWeight: 900, letterSpacing: 3, color: "#fff" } }, "DOTA BUILD INTEL")
+      ),
+      e("span", { style: { fontSize: 11, color: "#374151" } }, `${ALL_HEROES.length} héroes · OpenDota API`)
+    ),
+
+    // LAYOUT
+    e("div", { style: { display: "flex", flex: 1, height: "calc(100vh - 50px)", overflow: "hidden" } },
+
+      // SIDEBAR
+      e("aside", { style: { width: 260, background: "#0d1017", borderRight: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", overflow: "hidden", flexShrink: 0 } },
+
+        // Buscador
+        e("div", { style: { padding: "10px", borderBottom: "1px solid rgba(255,255,255,0.06)" } },
+          e("div", { style: { position: "relative" } },
+            e("span", { style: { position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: 13 } }, "🔍"),
+            e("input", {
+              style: { width: "100%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: 8, padding: "8px 28px 8px 30px", color: "#e2e8f0", fontSize: 13, fontFamily: "inherit" },
+              placeholder: `Buscar héroe...`,
+              value: search,
+              onChange: ev => setSearch(ev.target.value),
+              autoComplete: "off",
+              spellCheck: false
+            }),
+            search && e("button", { onClick: () => setSearch(""), style: { position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#6b7280", cursor: "pointer", fontSize: 14 } }, "✕")
+          ),
+          search && e("div", { style: { fontSize: 11, color: "#4b5563", marginTop: 5, paddingLeft: 2 } }, `${filtered.length} resultado${filtered.length !== 1 ? "s" : ""}`)
+        ),
+
+        // Lista héroes
+        e("div", { style: { flex: 1, overflowY: "auto" } },
+          displayHeroes.length === 0 && e("div", { style: { padding: "24px 16px", color: "#4b5563", fontSize: 13, textAlign: "center" } }, `No se encontró "${search}"`),
+          ...displayHeroes.map(h =>
+            e("button", {
+              key: h.id,
+              className: `hrow${selected?.id === h.id ? " hrow-active" : ""}`,
+              onClick: () => loadBuild(h),
+              style: { width: "100%", background: "transparent", border: "none", borderLeft: "3px solid transparent", padding: "7px 10px", cursor: "pointer", display: "flex", alignItems: "center", gap: 9, textAlign: "left" }
+            },
+              e("img", { src: HERO_IMG(h.name), style: { width: 46, height: 26, borderRadius: 4, objectFit: "cover", background: "#1a2030", flexShrink: 0 }, alt: "", onError: ev => ev.target.style.opacity = "0.1" }),
+              e("div", { style: { flex: 1, minWidth: 0 } },
+                e("div", { style: { fontSize: 12, color: selected?.id === h.id ? "#f59e0b" : "#d1d5db", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, h.localized_name),
+                e("div", { style: { display: "flex", gap: 4, marginTop: 2 } },
+                  ...h.roles.slice(0, 2).map(r => e("span", { key: r, style: { fontSize: 9, color: ROLES_COLOR[r] || "#555", fontWeight: 700 } }, r))
+                )
+              ),
+              selected?.id === h.id && e("span", { style: { color: "#f59e0b", fontSize: 8 } }, "●")
+            )
+          )
+        )
+      ),
+
+      // MAIN
+      e("main", { style: { flex: 1, overflowY: "auto", minWidth: 0 } },
+
+        !selected && e("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 16, padding: 40, textAlign: "center" } },
+          e("div", { style: { fontSize: 60 } }, "⚔️"),
+          e("div", { style: { fontSize: 24, fontWeight: 900, letterSpacing: 2, color: "#fff" } }, "Elige un héroe"),
+          e("div", { style: { fontSize: 14, color: "#6b7280", maxWidth: 320, lineHeight: 1.6 } }, "Haz clic en cualquier héroe de la lista para ver su build con mayor winrate"),
+          e("div", { style: { fontSize: 12, color: "#4b5563", background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.1)", borderRadius: 8, padding: "10px 20px" } }, `💡 ${ALL_HEROES.length} héroes cargados · busca por nombre`)
+        ),
+
+        selected && e("div", { key: selected.id, style: { animation: "fadeIn 0.25s ease" } },
+
+          // Banner
+          e("div", { style: { position: "relative", height: 160, overflow: "hidden" } },
+            e("div", { style: { position: "absolute", inset: 0, backgroundImage: `url(${HERO_IMG(selected.name)})`, backgroundSize: "cover", backgroundPosition: "center 25%", filter: "blur(4px) brightness(0.3)", transform: "scale(1.1)" } }),
+            e("div", { style: { position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(0,0,0,0.1), #0a0c10)" } }),
+            e("div", { style: { position: "relative", zIndex: 1, padding: "20px 28px", display: "flex", alignItems: "flex-end", gap: 20, height: "100%" } },
+              e("img", { src: HERO_IMG(selected.name), style: { width: 90, height: 52, borderRadius: 6, objectFit: "cover", border: "2px solid rgba(245,158,11,0.5)" }, alt: "", onError: ev => ev.target.style.display = "none" }),
+              e("div", null,
+                e("h1", { style: { fontSize: 30, fontWeight: 900, letterSpacing: 2, color: "#fff", textTransform: "uppercase", textShadow: "0 2px 12px rgba(0,0,0,0.9)" } }, selected.localized_name),
+                e("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 } },
+                  ...selected.roles.map(r => e("span", { key: r, style: { fontSize: 10, border: `1px solid ${ROLES_COLOR[r] || "#555"}`, borderRadius: 100, padding: "2px 9px", fontWeight: 700, color: ROLES_COLOR[r] || "#aaa" } }, r))
+                )
+              )
+            )
+          ),
+
+          // Tabs
+          e("div", { style: { display: "flex", padding: "0 28px", borderBottom: "1px solid rgba(255,255,255,0.07)" } },
+            ...["items", "abilities"].map(id =>
+              e("button", { key: id, onClick: () => setActiveTab(id), style: { background: "transparent", border: "none", borderBottom: activeTab === id ? "2px solid #f59e0b" : "2px solid transparent", color: activeTab === id ? "#f59e0b" : "#6b7280", padding: "10px 18px", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "inherit", marginBottom: "-1px" } },
+                id === "items" ? "🗡️ Items por fase" : "✨ Habilidades"
+              )
+            )
+          ),
+
+          // Loading
+          loading && e("div", { style: { display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "60px 40px", color: "#6b7280", fontSize: 14 } },
+            e("div", { style: { width: 28, height: 28, border: "2px solid rgba(245,158,11,0.15)", borderTop: "2px solid #f59e0b", borderRadius: "50%", animation: "spin 0.8s linear infinite" } }),
+            `Cargando builds de ${selected.localized_name}...`
+          ),
+
+          error && e("div", { style: { margin: 28, padding: "16px 20px", background: "rgba(248,113,113,0.08)", border: "1px solid rgba(248,113,113,0.25)", borderRadius: 10, color: "#f87171", fontSize: 13 } }, `⚠️ ${error}`),
+
+          // Build data
+          buildData && !loading && e("div", { style: { padding: "22px 28px 48px" } },
+
+            // ITEMS TAB
+            activeTab === "items" && e("div", { style: { display: "flex", flexDirection: "column", gap: 18 } },
+              e("p", { style: { fontSize: 13, color: "#4b5563" } }, "Top 5 ítems por ", e("strong", { style: { color: "#f59e0b" } }, "winrate"), " en cada fase · mín. 50 partidas"),
+              ...getTopItems(buildData.items).map(phase =>
+                e("div", { key: phase.label, style: { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, overflow: "hidden" } },
+                  e("div", { style: { padding: "11px 16px", background: "rgba(255,255,255,0.025)", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "space-between" } },
+                    e("span", { style: { fontSize: 13, fontWeight: 800, letterSpacing: 1.5, color: "#f59e0b", textTransform: "uppercase" } }, `${phase.icon} ${phase.label} game`),
+                    phase.items.length === 0 && e("span", { style: { fontSize: 11, color: "#374151", fontStyle: "italic" } }, "Sin datos suficientes")
+                  ),
+                  phase.items.length > 0 && e("div", { style: { display: "flex", flexWrap: "wrap" } },
+                    ...phase.items.map((item, i) =>
+                      e("div", { key: item.name, style: { flex: "1 1 110px", padding: "14px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, borderRight: "1px solid rgba(255,255,255,0.04)", textAlign: "center" } },
+                        e("span", { style: { fontSize: 10, color: i === 0 ? "#f59e0b" : "#374151", fontFamily: "monospace", fontWeight: 700 } }, `#${i + 1}`),
+                        e(ItemCard, { name: item.name }),
+                        e("div", { style: { fontSize: 11, color: "#9ca3af", textTransform: "capitalize", lineHeight: 1.3, maxWidth: 100 } }, item.name.replace("item_", "").replace(/_/g, " ")),
+                        e(WinrateBadge, { wr: item.wr }),
+                        e("div", { style: { fontSize: 10, color: "#374151", fontFamily: "monospace" } }, `${item.games.toLocaleString()} partidas`)
+                      )
+                    )
+                  )
+                )
+              )
+            ),
+
+            // ABILITIES TAB
+            activeTab === "abilities" && e("div", { style: { display: "flex", flexDirection: "column", gap: 10 } },
+              e("p", { style: { fontSize: 13, color: "#4b5563", marginBottom: 4 } }, "Habilidades con mayor ", e("strong", { style: { color: "#f59e0b" } }, "winrate"), " · mín. 100 partidas"),
+              getTopAbilities(buildData.abilities).length === 0
+                ? e("div", { style: { padding: 20, color: "#4b5563", fontSize: 13, textAlign: "center" } }, "Sin datos para este héroe")
+                : getTopAbilities(buildData.abilities).map((ab, i) => {
+                    const pct = Math.round(ab.wr * 100);
+                    const barColor = pct >= 55 ? "#4ade80" : pct >= 50 ? "#fbbf24" : "#f87171";
+                    return e("div", { key: ab.name, style: { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "12px 16px", display: "flex", alignItems: "center", gap: 14 } },
+                      e("div", { style: { fontSize: 12, fontFamily: "monospace", fontWeight: 800, minWidth: 26, color: i < 3 ? "#f59e0b" : "#374151" } }, `#${i + 1}`),
+                      e("div", { style: { flex: 1, minWidth: 0 } },
+                        e("div", { style: { fontSize: 13, fontWeight: 600, color: "#d1d5db", textTransform: "capitalize", marginBottom: 7 } }, ab.name.replace(/_/g, " ")),
+                        e("div", { style: { height: 5, background: "rgba(255,255,255,0.06)", borderRadius: 3, overflow: "hidden" } },
+                          e("div", { style: { height: "100%", width: `${pct}%`, background: barColor, borderRadius: 3 } })
+                        )
+                      ),
+                      e("div", { style: { textAlign: "right", flexShrink: 0, minWidth: 80 } },
+                        e(WinrateBadge, { wr: ab.wr }),
+                        e("div", { style: { fontSize: 10, color: "#374151", fontFamily: "monospace", marginTop: 3 } }, `${ab.games.toLocaleString()}p`)
+                      )
+                    );
+                  })
+            )
+          )
+        )
+      )
+    )
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
+</body>
+</html>
