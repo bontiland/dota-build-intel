@@ -30,6 +30,7 @@ const { useState, useCallback } = React;
 const API = "https://api.opendota.com/api";
 const ITEM_IMG = (name) => `https://cdn.dota2.com/apps/dota2/images/items/${name.replace("item_", "")}_lg.png`;
 const HERO_IMG = (name) => `https://cdn.dota2.com/apps/dota2/images/heroes/${name.replace("npc_dota_hero_", "")}_full.png`;
+const HERO_IMG2 = (name) => `https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/${name.replace("npc_dota_hero_", "")}.png`;
 
 const ROLES_COLOR = {
   Carry: "#f59e0b", Support: "#60a5fa", Nuker: "#f87171",
@@ -224,7 +225,7 @@ function App() {
     ].map(({ key, label, icon }) => ({
       label, icon,
       items: Object.entries(data[key] || {})
-        .filter(([, s]) => s.games > 50)
+        .filter(([, s]) => s && s.games > 0)
         .sort(([, a], [, b]) => (b.wins / b.games) - (a.wins / a.games))
         .slice(0, 5)
         .map(([name, s]) => ({ name, wr: s.wins / s.games, games: s.games })),
@@ -234,8 +235,8 @@ function App() {
   const getTopAbilities = (abilities) => {
     if (!abilities) return [];
     return Object.entries(abilities)
+      .filter(([, s]) => s && s.games > 0)
       .map(([name, s]) => ({ name, wr: s.wins / s.games, games: s.games }))
-      .filter(a => a.games > 100)
       .sort((a, b) => b.wr - a.wr)
       .slice(0, 8);
   };
@@ -354,7 +355,7 @@ function App() {
                 e("div", { key: phase.label, style: { background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, overflow: "hidden" } },
                   e("div", { style: { padding: "11px 16px", background: "rgba(255,255,255,0.025)", borderBottom: "1px solid rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "space-between" } },
                     e("span", { style: { fontSize: 13, fontWeight: 800, letterSpacing: 1.5, color: "#f59e0b", textTransform: "uppercase" } }, `${phase.icon} ${phase.label} game`),
-                    phase.items.length === 0 && e("span", { style: { fontSize: 11, color: "#374151", fontStyle: "italic" } }, "Sin datos suficientes")
+                    phase.items.length === 0 && e("span", { style: { fontSize: 11, color: "#374151", fontStyle: "italic" } }, "Sin datos disponibles")
                   ),
                   phase.items.length > 0 && e("div", { style: { display: "flex", flexWrap: "wrap" } },
                     ...phase.items.map((item, i) =>
